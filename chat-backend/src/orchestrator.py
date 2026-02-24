@@ -6,7 +6,8 @@ import logging
 from dataclasses import dataclass, field
 
 from llm.base import LLMClient
-from mcp_client import MCPClient, MCPSessionPool
+from mcp_client import MCPClient
+from mcp_session_manager import MCPSessionManager
 
 logger = logging.getLogger(__name__)
 
@@ -38,13 +39,13 @@ class ChatResult:
 
 
 class ChatOrchestrator:
-    def __init__(self, llm_client: LLMClient, mcp_pool: MCPSessionPool):
+    def __init__(self, llm_client: LLMClient, mcp: MCPSessionManager):
         self._llm = llm_client
-        self._mcp_pool = mcp_pool
+        self._mcp = mcp
 
     async def chat(self, messages: list[dict]) -> ChatResult:
         try:
-            async with self._mcp_pool.acquire() as mcp:
+            async with self._mcp.session() as mcp:
                 return await asyncio.wait_for(
                     self._run_loop(mcp, messages),
                     timeout=TIMEOUT_SECONDS,
@@ -56,7 +57,7 @@ class ChatOrchestrator:
             raise
 
     async def _run_loop(self, mcp: MCPClient, user_messages: list[dict]) -> ChatResult:
-        tools = self._mcp_pool.get_tools()
+        tools = self._mcp.get_tools()
         trace: list[dict] = []
 
         llm_messages = [

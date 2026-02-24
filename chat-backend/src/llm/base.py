@@ -24,5 +24,4 @@ class LLMClient(ABC):
         messages: list[dict],
         tools: list[dict],
     ) -> LLMResponse:
-        """Send messages + tool definitions to the LLM, return response."""
         ...

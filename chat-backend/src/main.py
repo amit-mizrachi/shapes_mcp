@@ -10,30 +10,33 @@ from pydantic import BaseModel, Field
 
 from config import Settings
 from orchestrator import ChatOrchestrator
-from mcp_client import MCPSessionPool
+from mcp_session_manager import MCPSessionManager
 from llm.claude import ClaudeLLMClient
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 settings = Settings()
-pool: MCPSessionPool | None = None
+mcp_manager: MCPSessionManager | None = None
 orchestrator: ChatOrchestrator | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global pool, orchestrator
+    global mcp_manager, orchestrator
 
-    pool = MCPSessionPool(url=settings.MCP_SERVER_URL, size=settings.MCP_POOL_SIZE)
+    mcp_manager = MCPSessionManager(
+        url=settings.MCP_SERVER_URL,
+        max_concurrent=settings.MCP_MAX_CONCURRENT,
+    )
 
     for attempt in range(10):
         try:
-            await pool.initialize()
-            logger.info("MCP session pool initialized (size=%d)", settings.MCP_POOL_SIZE)
+            await mcp_manager.initialize()
+            logger.info("MCP client ready (max_concurrent=%d)", settings.MCP_MAX_CONCURRENT)
             break
         except Exception as e:
-            logger.warning("Pool init attempt %d/10 failed: %s", attempt + 1, e)
+            logger.warning("MCP init attempt %d/10 failed: %s", attempt + 1, e)
             if attempt < 9:
                 await asyncio.sleep(3)
             else:
@@ -43,10 +46,9 @@ async def lifespan(app: FastAPI):
         api_key=settings.ANTHROPIC_API_KEY,
         model=settings.ANTHROPIC_MODEL,
     )
-    orchestrator = ChatOrchestrator(llm_client, pool)
+    orchestrator = ChatOrchestrator(llm_client, mcp_manager)
     logger.info("Chat backend started. MCP server URL: %s", settings.MCP_SERVER_URL)
     yield
-    await pool.close()
 
 
 app = FastAPI(title="Chat Backend", lifespan=lifespan)
@@ -90,11 +92,8 @@ async def chat(request: ChatRequest):
         result = await orchestrator.chat(messages)
         return ChatResponse(answer=result.answer, tool_calls=result.tool_calls)
     except ConnectionError as e:
-        if "pool exhausted" in str(e):
-            logger.warning("MCP pool exhausted: %s", e)
-            raise HTTPException(status_code=503, detail="Server busy. Please try again shortly.")
-        logger.error("MCP server connection failed", exc_info=True)
-        raise HTTPException(status_code=502, detail="Unable to connect to data server.")
+        logger.warning("MCP connection error: %s", e)
+        raise HTTPException(status_code=503, detail="Server busy. Please try again shortly.")
     except Exception as e:
         error_type = type(e).__name__
         logger.error("Chat error (%s): %s", error_type, e, exc_info=True)
