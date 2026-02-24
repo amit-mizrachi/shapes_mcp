@@ -17,7 +17,7 @@ A CSV-agnostic data exploration tool that combines an MCP (Model Context Protoco
 
 **Three Docker Compose services:**
 
-1. **MCP Server** — Ingests a CSV into SQLite on startup. Table name derived from CSV filename (e.g., `shapes.csv` → table `shapes`). Exposes `get_schema()` and `query_data()` tools via MCP Streamable HTTP transport.
+1. **MCP Server** — Ingests a CSV into SQLite on startup. Table name derived from CSV filename (e.g., `shapes.csv` → table `shapes`). Exposes `get_schema()`, `select_rows()`, and `aggregate()` tools via MCP Streamable HTTP transport.
 2. **Chat Backend** — FastAPI service that receives conversation history, orchestrates an LLM agent loop (Claude) with per-request MCP client sessions, and returns answers with tool call traces.
 3. **Chat Frontend** — React SPA served by nginx. Renders markdown (tables, code, lists), maintains full conversation history for follow-up questions, proxies API calls to the backend.
 
@@ -75,7 +75,7 @@ shapes_mcp/
 │   └── src/
 │       ├── main.py                # Server setup, /health, lifespan
 │       ├── db.py                  # CSV ingestion, type detection
-│       └── tools.py               # get_schema(), query_data()
+│       └── tools.py               # get_schema(), select_rows(), aggregate()
 ├── chat-backend/                  # Chat API (FastAPI)
 │   ├── Dockerfile
 │   ├── .dockerignore

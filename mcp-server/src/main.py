@@ -7,7 +7,7 @@ from mcp.server.fastmcp import FastMCP
 from starlette.responses import JSONResponse
 
 from db import DB_PATH, ingest_csv
-from tools import get_schema, query_data
+from tools import get_schema, select_rows, aggregate
 
 
 @asynccontextmanager
@@ -33,7 +33,8 @@ mcp = FastMCP(
 )
 
 mcp.tool()(get_schema)
-mcp.tool()(query_data)
+mcp.tool()(select_rows)
+mcp.tool()(aggregate)
 
 app = mcp.streamable_http_app()
 
