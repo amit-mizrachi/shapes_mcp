@@ -1,0 +1,50 @@
+services:
+  mcp-server:
+    build: ./mcp-server
+    expose:
+      - "3001"
+    volumes:
+      - ./data:/app/data:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3001/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  chat-backend:
+    build: ./chat-backend
+    expose:
+      - "3002"
+    environment:
+      - MCP_SERVER_URL=http://mcp-server:3001/mcp
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    depends_on:
+      mcp-server:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3002/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  chat-frontend:
+    build: ./chat-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      chat-backend:
+        condition: service_healthy
+    restart: unless-stopped
