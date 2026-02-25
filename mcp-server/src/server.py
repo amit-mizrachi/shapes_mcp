@@ -1,4 +1,5 @@
 import glob
+import logging
 import os
 from contextlib import asynccontextmanager
 
@@ -9,22 +10,29 @@ from starlette.responses import JSONResponse
 import tools
 from repository.sqlite import SqliteIngester, SqliteRepository
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def server_lifespan(server: FastMCP):
     db_path = os.environ.get("DB_PATH", "/app/db/data.db")
     data_dir = os.environ.get("DATA_DIR", "/app/data")
+    logger.info("Starting server (db_path=%s, data_dir=%s)", db_path, data_dir)
     csv_files = sorted(glob.glob(os.path.join(data_dir, "*.csv")))
     repository = None
     if not csv_files:
-        print(f"WARNING: No CSV files found in {data_dir}")
+        logger.warning("No CSV files found in %s", data_dir)
     else:
         csv_path = csv_files[0]
-        print(f"Ingesting {csv_path} ...")
+        logger.info("Ingesting %s", csv_path)
         ingester = SqliteIngester(db_path)
         ingest_result = ingester.ingest(csv_path)
         repository = SqliteRepository(ingest_result.db_path, ingest_result.table_name, ingest_result.columns)
-        print("Ingestion complete.")
+        logger.info("Ingestion complete, repository ready")
     yield {"repository": repository}
 
 

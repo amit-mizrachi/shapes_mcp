@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import logging
+
 import aiosqlite
 
 from repository.models import ColumnInfo, QueryResult, TableSchema
+
+logger = logging.getLogger(__name__)
 
 FILTER_SUFFIX_TO_SQL_OPERATOR = {
     "_gt": ">",
@@ -84,6 +88,9 @@ class SqliteRepository:
             columns = [d[0] for d in cursor.description]
             row_dicts = [dict(zip(columns, row)) for row in rows]
             return QueryResult(columns=columns, rows=row_dicts, count=len(row_dicts))
+        except Exception:
+            logger.error("select_rows query failed (sql=%s)", sql, exc_info=True)
+            raise
         finally:
             await conn.close()
 
@@ -136,5 +143,8 @@ class SqliteRepository:
             columns = [d[0] for d in cursor.description]
             row_dicts = [dict(zip(columns, row)) for row in rows]
             return QueryResult(columns=columns, rows=row_dicts, count=len(row_dicts))
+        except Exception:
+            logger.error("aggregate query failed (sql=%s)", sql, exc_info=True)
+            raise
         finally:
             await conn.close()

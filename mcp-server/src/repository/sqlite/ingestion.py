@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 import os
 import sqlite3
 
 from repository.csv_parser import parse_csv
 from repository.models import IngestResult
+
+logger = logging.getLogger(__name__)
 
 
 class SqliteIngester:
@@ -33,9 +36,11 @@ class SqliteIngester:
         conn.commit()
         conn.close()
 
-        print(
-            f"Ingested {len(parsed.rows)} rows into table '{parsed.table_name}' "
-            f"with columns: {[c.name for c in parsed.columns]}"
+        logger.info(
+            "Ingested %d rows into table '%s' (%d columns)",
+            len(parsed.rows),
+            parsed.table_name,
+            len(parsed.columns),
         )
 
         return IngestResult(
