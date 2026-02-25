@@ -6,22 +6,26 @@ import uvicorn
 from mcp.server.fastmcp import FastMCP
 from starlette.responses import JSONResponse
 
-from db import DB_PATH, ingest_csv
-from tools import get_schema, select_rows, aggregate
+import tools
+from repository.sqlite import SqliteIngester, SqliteRepository
 
 
 @asynccontextmanager
 async def lifespan(server: FastMCP):
+    db_path = os.environ.get("DB_PATH", "/app/db/data.db")
     data_dir = os.environ.get("DATA_DIR", "/app/data")
     csv_files = sorted(glob.glob(os.path.join(data_dir, "*.csv")))
+    repo = None
     if not csv_files:
         print(f"WARNING: No CSV files found in {data_dir}")
     else:
         csv_path = csv_files[0]
         print(f"Ingesting {csv_path} ...")
-        ingest_csv(csv_path, DB_PATH)
+        ingester = SqliteIngester(db_path)
+        result = ingester.ingest(csv_path)
+        repo = SqliteRepository(result.db_path, result.table_name, result.columns)
         print("Ingestion complete.")
-    yield
+    yield {"repo": repo}
 
 
 mcp = FastMCP(
@@ -32,9 +36,9 @@ mcp = FastMCP(
     streamable_http_path="/mcp",
 )
 
-mcp.tool()(get_schema)
-mcp.tool()(select_rows)
-mcp.tool()(aggregate)
+mcp.tool()(tools.get_schema)
+mcp.tool()(tools.select_rows)
+mcp.tool()(tools.aggregate)
 
 app = mcp.streamable_http_app()
 
