@@ -10,8 +10,8 @@ from mcp_client import MCPClient
 logger = logging.getLogger(__name__)
 
 
-class MCPSessionManager:
-    """Creates ephemeral MCP sessions with concurrency control and tool caching."""
+class MCPClientManager:
+    """Creates ephemeral MCP clients with concurrency control and tool caching."""
 
     def __init__(self, url: str, max_concurrent: int):
         self._url = url
@@ -28,8 +28,8 @@ class MCPSessionManager:
         return self._tools
 
     @asynccontextmanager
-    async def session(self) -> AsyncIterator[MCPClient]:
-        """Create an ephemeral session, gated by semaphore."""
+    async def client(self) -> AsyncIterator[MCPClient]:
+        """Create an ephemeral client, gated by semaphore."""
         try:
             await asyncio.wait_for(self._semaphore.acquire(), timeout=30.0)
         except asyncio.TimeoutError:

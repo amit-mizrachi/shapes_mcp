@@ -10,14 +10,14 @@ from pydantic import BaseModel, Field
 
 from config import Settings
 from orchestrator import ChatOrchestrator
-from mcp_session_manager import MCPSessionManager
+from mcp_client_manager import MCPClientManager
 from llm.claude import ClaudeLLMClient
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 settings = Settings()
-mcp_manager: MCPSessionManager | None = None
+mcp_manager: MCPClientManager | None = None
 orchestrator: ChatOrchestrator | None = None
 
 
@@ -25,7 +25,7 @@ orchestrator: ChatOrchestrator | None = None
 async def lifespan(app: FastAPI):
     global mcp_manager, orchestrator
 
-    mcp_manager = MCPSessionManager(
+    mcp_manager = MCPClientManager(
         url=settings.MCP_SERVER_URL,
         max_concurrent=settings.MCP_MAX_CONCURRENT,
     )
