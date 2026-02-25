@@ -10,7 +10,8 @@ from starlette.responses import JSONResponse
 
 import tools
 from config import config
-from repository.sqlite import SqliteIngester, SqliteRepository
+from repository.sqlite.sqlite_ingester import SqliteIngester
+from repository.sqlite.sqlite_repository import SqliteRepository
 
 logging.basicConfig(
     level=logging.INFO,
@@ -18,31 +19,25 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-SHARED_MEMORY_URI = "file:data?mode=memory&cache=shared"
-
 
 @asynccontextmanager
 async def server_lifespan(server: FastMCP):
-    data_dir = config.data_dir
     logger.info("Starting MCP server")
-
     # Keeper connection: holds the shared in-memory DB alive for the server's lifetime.
-    # All data is ingested once at startup; concurrent writes are not expected.
-    keeper_conn = sqlite3.connect(SHARED_MEMORY_URI, uri=True)
+    keeper_connection = sqlite3.connect(config.shared_memory_uri, uri=True)
     try:
-        csv_files = sorted(glob.glob(os.path.join(data_dir, "*.csv")))
-        repository = None
-        if not csv_files:
-            logger.warning("No CSV files found")
-        else:
-            csv_path = csv_files[0]
-            logger.info("Ingesting CSV data")
-            ingester = SqliteIngester(SHARED_MEMORY_URI)
-            ingest_result = ingester.ingest(csv_path)
-            repository = SqliteRepository(SHARED_MEMORY_URI, ingest_result.table_name, ingest_result.columns)
+        logger.info("Initializing database ingestor")
+        ingester = SqliteIngester(config.shared_memory_uri)
+
+        logger.info("Ingesting CSV data to database")
+        ingest_result = ingester.ingest(config.csv_file_path)
+
+        logger.info("Initializing SQL Repository")
+        repository = SqliteRepository(config.shared_memory_uri, ingest_result.table_name, ingest_result.columns)
+
         yield {"repository": repository}
     finally:
-        keeper_conn.close()
+        keeper_connection.close()
 
 
 mcp_server = FastMCP(
@@ -59,11 +54,10 @@ mcp_server.tool()(tools.aggregate)
 
 http_app = mcp_server.streamable_http_app()
 
-
-@http_app.route("/health")
 async def health(request):
     return JSONResponse({"status": "ok"})
 
+http_app.add_route("/health", health)
 
 if __name__ == "__main__":
     uvicorn.run(http_app, host="0.0.0.0", port=3001)

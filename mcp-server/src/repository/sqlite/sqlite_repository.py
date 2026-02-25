@@ -4,7 +4,9 @@ import logging
 
 import aiosqlite
 
-from repository.models import ColumnInfo, QueryResult, TableSchema
+from shared.modules.column_info import ColumnInfo
+from shared.modules.query_result import QueryResult
+from shared.modules.table_schema import TableSchema
 
 logger = logging.getLogger(__name__)
 

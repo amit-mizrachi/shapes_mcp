@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import anthropic
-from .base import LLMClient, LLMResponse, ToolCall
+from llm.llm_client import LLMClient
+from shared.modules.llm_response import LLMResponse
+from shared.modules.tool_call import ToolCall
 
 
 class ClaudeLLMClient(LLMClient):

@@ -8,6 +8,7 @@ COPY mcp-server/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY shared/config.py ./config.py
+COPY shared/ ./shared/
 COPY mcp-server/src/ .
 
 RUN chown -R appuser:appuser /app

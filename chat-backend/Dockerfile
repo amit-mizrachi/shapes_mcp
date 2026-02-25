@@ -8,6 +8,7 @@ COPY chat-backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY shared/config.py ./config.py
+COPY shared/ ./shared/
 COPY chat-backend/src/ .
 
 USER appuser

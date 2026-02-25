@@ -6,7 +6,8 @@ class Config(BaseModel):
 
     # MCP Server
     db_path: str = "/app/db/data.db"
-    data_dir: str = "/app/data"
+    csv_file_path: str = "/app/data/people-list-export.csv"
+    shared_memory_uri: str = "file:data?mode=memory&cache=shared"
 
     # Chat Backend
     mcp_server_url: str = "http://mcp-server:3001/mcp"

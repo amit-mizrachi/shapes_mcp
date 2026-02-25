@@ -5,7 +5,7 @@ import os
 import re
 from dataclasses import dataclass
 
-from repository.models import ColumnInfo
+from shared.modules.column_info import ColumnInfo
 
 class CSVParser:
     @staticmethod

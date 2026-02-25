@@ -5,7 +5,7 @@ import logging
 
 from mcp.server.fastmcp import Context
 
-from repository import DataRepository
+from repository.data_repository import DataRepository
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ async def select_rows(
       Example: {"age_gt": 30, "city": "London"}
     - limit: max rows to return (default 20, max 100).
     """
-    logger.info("Executing select_rows")
+    logger.info("Executing row selection tool")
     repository = _get_repository(ctx)
     try:
         query_result = await repository.select_rows(filters=filters, fields=fields, limit=limit)
@@ -81,7 +81,7 @@ async def aggregate(
     - filters: dict of conditions, same syntax as select_rows.
     - limit: max groups to return when using group_by (default 20, max 100).
     """
-    logger.info("Executing aggregate")
+    logger.info("Executing aggregation tool")
     repository = _get_repository(ctx)
     try:
         query_result = await repository.aggregate(op=op, field=field, group_by=group_by, filters=filters, limit=limit)

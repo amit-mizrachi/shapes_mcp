@@ -3,9 +3,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from dataclasses import dataclass, field
 
-from llm.base import LLMClient
+from shared.modules.chat_result import ChatResult
+from llm.llm_client import LLMClient
 from mcp_layer.mcp_client import MCPClient
 from mcp_layer.mcp_client_manager import MCPClientManager
 
@@ -23,19 +23,6 @@ Always base your answers on actual query results, not assumptions."""
 
 MAX_ITERATIONS = 10
 TIMEOUT_SECONDS = 120
-
-
-@dataclass
-class ToolCallTrace:
-    name: str
-    arguments: dict
-    result: str
-
-
-@dataclass
-class ChatResult:
-    answer: str
-    tool_calls: list[dict] = field(default_factory=list)
 
 
 class ChatOrchestrator:

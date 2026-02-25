@@ -6,12 +6,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
 
 from config import config
-from orchestrator import ChatOrchestrator
+from chat_orchestrator import ChatOrchestrator
+from shared.modules.chat_request import ChatRequest
+from shared.modules.chat_response import ChatResponse
 from mcp_layer.mcp_client_manager import MCPClientManager
-from llm.claude import ClaudeLLMClient
+from llm.claude_llm_client import ClaudeLLMClient
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -55,20 +56,6 @@ app.add_middleware(
     allow_methods=["POST", "GET"],
     allow_headers=["Content-Type"],
 )
-
-
-class MessageItem(BaseModel):
-    role: str
-    content: str
-
-
-class ChatRequest(BaseModel):
-    messages: list[MessageItem] = Field(..., min_length=1, max_length=50)
-
-
-class ChatResponse(BaseModel):
-    answer: str
-    tool_calls: list[dict] = []
 
 
 @app.get("/health")

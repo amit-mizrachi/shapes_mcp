@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 
 from repository.csv_parser import CSVParser
-from repository.models import IngestResult
+from shared.modules.ingest_result import IngestResult
 
 
 class SqliteIngester:
@@ -16,10 +16,18 @@ class SqliteIngester:
         connection = sqlite3.connect(self._db_uri, uri=True)
         cursor = connection.cursor()
 
-        column_definitions = ", ".join(
-            f'"{c.name}" {"REAL" if c.detected_type == "numeric" else "TEXT"}'
-            for c in parsed.columns
-        )
+        column_definitions = []
+
+        for column in parsed.columns:
+            if column.detected_type == "numeric":
+                sql_type = "REAL"
+            else:
+                sql_type = "TEXT"
+
+            column_definitions.append(f'"{column.name}" {sql_type}')
+
+        column_definitions = ", ".join(column_definitions)
+
         cursor.execute(f'DROP TABLE IF EXISTS "{parsed.table_name}"')
         cursor.execute(f'CREATE TABLE "{parsed.table_name}" ({column_definitions})')
 
