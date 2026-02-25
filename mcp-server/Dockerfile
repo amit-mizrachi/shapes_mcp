@@ -15,4 +15,4 @@ USER appuser
 
 EXPOSE 3001
 
-CMD ["python", "main.py"]
+CMD ["python", "server.py"]

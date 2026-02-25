@@ -5,33 +5,33 @@ import os
 import re
 from dataclasses import dataclass
 
-from repository.protocol import ColumnInfo
+from repository.models import ColumnInfo
 
 
-def detect_type(values: list[str]) -> str:
+def detect_column_type(values: list[str]) -> str:
     """Return 'numeric' if >80% of non-empty values parse as float, else 'text'."""
-    numeric = 0
+    numeric_count = 0
     total = 0
-    for v in values:
-        v = v.strip()
-        if not v:
+    for value in values:
+        value = value.strip()
+        if not value:
             continue
         total += 1
         try:
-            float(v)
-            numeric += 1
+            float(value)
+            numeric_count += 1
         except ValueError:
             pass
     if total == 0:
         return "text"
-    return "numeric" if numeric / total > 0.8 else "text"
+    return "numeric" if numeric_count / total > 0.8 else "text"
 
 
-def derive_table_name(csv_path: str) -> str:
+def csv_filename_to_table_name(csv_path: str) -> str:
     """Convert a CSV filename into a safe SQL table name."""
     basename = os.path.splitext(os.path.basename(csv_path))[0]
-    safe = re.sub(r"[^a-z0-9]+", "_", basename.lower()).strip("_")
-    return safe or "data"
+    sanitized_name = re.sub(r"[^a-z0-9]+", "_", basename.lower()).strip("_")
+    return sanitized_name or "data"
 
 
 @dataclass(frozen=True)
@@ -54,22 +54,22 @@ def parse_csv(csv_path: str) -> ParsedCSV:
     if not rows:
         raise ValueError(f"CSV file {csv_path} has no data rows")
 
-    safe_columns = [re.sub(r"[^a-z0-9]+", "_", c.lower()).strip("_") for c in raw_columns]
-    table_name = derive_table_name(csv_path)
+    sanitized_columns = [re.sub(r"[^a-z0-9]+", "_", c.lower()).strip("_") for c in raw_columns]
+    table_name = csv_filename_to_table_name(csv_path)
 
     columns: list[ColumnInfo] = []
-    for orig, safe in zip(raw_columns, safe_columns):
+    for orig, sanitized in zip(raw_columns, sanitized_columns):
         values = [r[orig] for r in rows]
-        detected = detect_type(values)
-        columns.append(ColumnInfo(name=safe, detected_type=detected, samples=values[:3]))
+        detected = detect_column_type(values)
+        columns.append(ColumnInfo(name=sanitized, detected_type=detected, samples=values[:3]))
 
-    # Re-key rows from original headers to safe column names
-    col_map = dict(zip(raw_columns, safe_columns))
-    safe_rows = [{col_map[k]: v for k, v in row.items()} for row in rows]
+    # Re-key rows from original headers to sanitized column names
+    column_name_map = dict(zip(raw_columns, sanitized_columns))
+    sanitized_rows = [{column_name_map[k]: v for k, v in row.items()} for row in rows]
 
     return ParsedCSV(
         table_name=table_name,
         columns=columns,
-        headers=safe_columns,
-        rows=safe_rows,
+        headers=sanitized_columns,
+        rows=sanitized_rows,
     )

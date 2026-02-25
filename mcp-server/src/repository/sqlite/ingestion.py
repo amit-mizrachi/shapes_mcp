@@ -3,8 +3,8 @@ from __future__ import annotations
 import os
 import sqlite3
 
-from repository.csv_utils import parse_csv
-from repository.protocol import IngestResult
+from repository.csv_parser import parse_csv
+from repository.models import IngestResult
 
 
 class SqliteIngester:
@@ -16,19 +16,19 @@ class SqliteIngester:
 
         os.makedirs(os.path.dirname(self._db_path), exist_ok=True)
         conn = sqlite3.connect(self._db_path)
-        cur = conn.cursor()
+        cursor = conn.cursor()
 
-        col_defs = ", ".join(
+        column_definitions = ", ".join(
             f'"{c.name}" {"REAL" if c.detected_type == "numeric" else "TEXT"}'
             for c in parsed.columns
         )
-        cur.execute(f'DROP TABLE IF EXISTS "{parsed.table_name}"')
-        cur.execute(f'CREATE TABLE "{parsed.table_name}" ({col_defs})')
+        cursor.execute(f'DROP TABLE IF EXISTS "{parsed.table_name}"')
+        cursor.execute(f'CREATE TABLE "{parsed.table_name}" ({column_definitions})')
 
         placeholders = ", ".join("?" for _ in parsed.headers)
         for row in parsed.rows:
             values = [row[h] for h in parsed.headers]
-            cur.execute(f'INSERT INTO "{parsed.table_name}" VALUES ({placeholders})', values)
+            cursor.execute(f'INSERT INTO "{parsed.table_name}" VALUES ({placeholders})', values)
 
         conn.commit()
         conn.close()

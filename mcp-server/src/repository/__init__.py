@@ -1,4 +1,4 @@
-from repository.protocol import (
+from repository.models import (
     ColumnInfo,
     DataRepository,
     IngestResult,

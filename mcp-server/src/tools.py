@@ -7,11 +7,11 @@ from mcp.server.fastmcp import Context
 from repository import DataRepository
 
 
-def _get_repo(ctx: Context) -> DataRepository:
-    repo = ctx.request_context.lifespan_context.get("repo")
-    if repo is None:
+def _get_repository(ctx: Context) -> DataRepository:
+    repository = ctx.request_context.lifespan_context.get("repository")
+    if repository is None:
         raise RuntimeError("Repository not initialized")
-    return repo
+    return repository
 
 
 async def get_schema(ctx: Context) -> str:
@@ -20,8 +20,8 @@ async def get_schema(ctx: Context) -> str:
     Use this tool FIRST to understand what data is available before querying.
     Takes no parameters.
     """
-    repo = _get_repo(ctx)
-    schema = await repo.get_schema()
+    repository = _get_repository(ctx)
+    schema = await repository.get_schema()
     if schema is None:
         return json.dumps({"error": "No data loaded"})
     return json.dumps(
@@ -50,13 +50,13 @@ async def select_rows(
       Example: {"age_gt": 30, "city": "London"}
     - limit: max rows to return (default 20, max 100).
     """
-    repo = _get_repo(ctx)
+    repository = _get_repository(ctx)
     limit = min(max(1, limit), 100)
     try:
-        result = await repo.select_rows(filters=filters, fields=fields, limit=limit)
+        query_result = await repository.select_rows(filters=filters, fields=fields, limit=limit)
     except ValueError as e:
         return json.dumps({"error": str(e)})
-    return json.dumps({"data": result.rows, "count": result.count})
+    return json.dumps({"data": query_result.rows, "count": query_result.count})
 
 
 async def aggregate(
@@ -75,12 +75,12 @@ async def aggregate(
     - filters: dict of conditions, same syntax as select_rows.
     - limit: max groups to return when using group_by (default 20, max 100).
     """
-    repo = _get_repo(ctx)
+    repository = _get_repository(ctx)
     limit = min(max(1, limit), 100)
     try:
-        result = await repo.aggregate(
+        query_result = await repository.aggregate(
             op=op, field=field, group_by=group_by, filters=filters, limit=limit,
         )
     except ValueError as e:
         return json.dumps({"error": str(e)})
-    return json.dumps({"data": result.rows, "count": result.count})
+    return json.dumps({"data": query_result.rows, "count": query_result.count})

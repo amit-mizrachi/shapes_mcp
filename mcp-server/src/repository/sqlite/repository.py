@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import aiosqlite
 
-from repository.protocol import ColumnInfo, QueryResult, TableSchema
+from repository.models import ColumnInfo, QueryResult, TableSchema
 
-FILTER_OPS = {
+FILTER_SUFFIX_TO_SQL_OPERATOR = {
     "_gt": ">",
     "_gte": ">=",
     "_lt": "<",
@@ -20,7 +20,7 @@ class SqliteRepository:
         self._valid_columns = {c.name for c in columns}
         self._col_types = {c.name: c.detected_type for c in columns}
 
-    async def _connect(self) -> aiosqlite.Connection:
+    async def _open_readonly_connection(self) -> aiosqlite.Connection:
         conn = await aiosqlite.connect(f"file:{self._db_path}?mode=ro", uri=True)
         conn.row_factory = aiosqlite.Row
         return conn
@@ -36,7 +36,7 @@ class SqliteRepository:
         params: list[str | int | float] = []
         for key, value in filters.items():
             col, op = key, "="
-            for suffix, sql_op in FILTER_OPS.items():
+            for suffix, sql_op in FILTER_SUFFIX_TO_SQL_OPERATOR.items():
                 if key.endswith(suffix):
                     col, op = key[: -len(suffix)], sql_op
                     break
@@ -49,8 +49,8 @@ class SqliteRepository:
             else:
                 parts.append(f'"{col}" {op} ?')
             params.append(value)
-        where_sql = (" WHERE " + " AND ".join(parts)) if parts else ""
-        return where_sql, params
+        where_clause = (" WHERE " + " AND ".join(parts)) if parts else ""
+        return where_clause, params
 
     async def get_schema(self) -> TableSchema | None:
         if not self._columns:
@@ -64,26 +64,26 @@ class SqliteRepository:
         limit: int = 20,
     ) -> QueryResult:
         if fields:
-            for f in fields:
-                if f not in self._valid_columns:
+            for field_name in fields:
+                if field_name not in self._valid_columns:
                     raise ValueError(
-                        f"Column '{f}' not found. Valid columns: {sorted(self._valid_columns)}"
+                        f"Column '{field_name}' not found. Valid columns: {sorted(self._valid_columns)}"
                     )
-            select_cols = ", ".join(f'"{f}"' for f in fields)
+            select_cols = ", ".join(f'"{field_name}"' for field_name in fields)
         else:
             select_cols = "*"
 
-        where_sql, params = self._build_where(filters)
-        sql = f'SELECT {select_cols} FROM "{self._table_name}"{where_sql} LIMIT ?'
+        where_clause, params = self._build_where(filters)
+        sql = f'SELECT {select_cols} FROM "{self._table_name}"{where_clause} LIMIT ?'
         params.append(limit)
 
-        conn = await self._connect()
+        conn = await self._open_readonly_connection()
         try:
             cursor = await conn.execute(sql, params)
             rows = await cursor.fetchall()
             columns = [d[0] for d in cursor.description]
-            data = [dict(zip(columns, row)) for row in rows]
-            return QueryResult(columns=columns, rows=data, count=len(data))
+            row_dicts = [dict(zip(columns, row)) for row in rows]
+            return QueryResult(columns=columns, rows=row_dicts, count=len(row_dicts))
         finally:
             await conn.close()
 
@@ -95,13 +95,13 @@ class SqliteRepository:
         filters: dict[str, str | int | float] | None = None,
         limit: int = 20,
     ) -> QueryResult:
-        agg_op = op.upper()
-        if agg_op not in ("COUNT", "SUM", "AVG", "MIN", "MAX"):
+        sql_operation = op.upper()
+        if sql_operation not in ("COUNT", "SUM", "AVG", "MIN", "MAX"):
             raise ValueError(
                 f"Unsupported aggregation op: {op}. Use count, sum, avg, min, or max."
             )
 
-        if agg_op != "COUNT" and (not field or field not in self._valid_columns):
+        if sql_operation != "COUNT" and (not field or field not in self._valid_columns):
             raise ValueError(
                 f"'field' is required for {op} and must be a valid column. "
                 f"Valid columns: {sorted(self._valid_columns)}"
@@ -112,29 +112,29 @@ class SqliteRepository:
                 f"Column '{group_by}' not found. Valid columns: {sorted(self._valid_columns)}"
             )
 
-        where_sql, params = self._build_where(filters)
+        where_clause, params = self._build_where(filters)
 
-        if agg_op == "COUNT":
-            select_expr = "COUNT(*)"
+        if sql_operation == "COUNT":
+            aggregation_expression = "COUNT(*)"
         else:
-            select_expr = f'{agg_op}(CAST("{field}" AS REAL))'
+            aggregation_expression = f'{sql_operation}(CAST("{field}" AS REAL))'
 
         if group_by:
             sql = (
-                f'SELECT "{group_by}", {select_expr} AS result '
-                f'FROM "{self._table_name}"{where_sql} '
+                f'SELECT "{group_by}", {aggregation_expression} AS result '
+                f'FROM "{self._table_name}"{where_clause} '
                 f'GROUP BY "{group_by}" ORDER BY result DESC LIMIT ?'
             )
             params.append(limit)
         else:
-            sql = f'SELECT {select_expr} AS result FROM "{self._table_name}"{where_sql}'
+            sql = f'SELECT {aggregation_expression} AS result FROM "{self._table_name}"{where_clause}'
 
-        conn = await self._connect()
+        conn = await self._open_readonly_connection()
         try:
             cursor = await conn.execute(sql, params)
             rows = await cursor.fetchall()
             columns = [d[0] for d in cursor.description]
-            data = [dict(zip(columns, row)) for row in rows]
-            return QueryResult(columns=columns, rows=data, count=len(data))
+            row_dicts = [dict(zip(columns, row)) for row in rows]
+            return QueryResult(columns=columns, rows=row_dicts, count=len(row_dicts))
         finally:
             await conn.close()

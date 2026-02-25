@@ -11,42 +11,42 @@ from repository.sqlite import SqliteIngester, SqliteRepository
 
 
 @asynccontextmanager
-async def lifespan(server: FastMCP):
+async def server_lifespan(server: FastMCP):
     db_path = os.environ.get("DB_PATH", "/app/db/data.db")
     data_dir = os.environ.get("DATA_DIR", "/app/data")
     csv_files = sorted(glob.glob(os.path.join(data_dir, "*.csv")))
-    repo = None
+    repository = None
     if not csv_files:
         print(f"WARNING: No CSV files found in {data_dir}")
     else:
         csv_path = csv_files[0]
         print(f"Ingesting {csv_path} ...")
         ingester = SqliteIngester(db_path)
-        result = ingester.ingest(csv_path)
-        repo = SqliteRepository(result.db_path, result.table_name, result.columns)
+        ingest_result = ingester.ingest(csv_path)
+        repository = SqliteRepository(ingest_result.db_path, ingest_result.table_name, ingest_result.columns)
         print("Ingestion complete.")
-    yield {"repo": repo}
+    yield {"repository": repository}
 
 
-mcp = FastMCP(
+mcp_server = FastMCP(
     "MCP Data Server",
-    lifespan=lifespan,
+    lifespan=server_lifespan,
     host="0.0.0.0",
     port=3001,
     streamable_http_path="/mcp",
 )
 
-mcp.tool()(tools.get_schema)
-mcp.tool()(tools.select_rows)
-mcp.tool()(tools.aggregate)
+mcp_server.tool()(tools.get_schema)
+mcp_server.tool()(tools.select_rows)
+mcp_server.tool()(tools.aggregate)
 
-app = mcp.streamable_http_app()
+http_app = mcp_server.streamable_http_app()
 
 
-@app.route("/health")
+@http_app.route("/health")
 async def health(request):
     return JSONResponse({"status": "ok"})
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=3001)
+    uvicorn.run(http_app, host="0.0.0.0", port=3001)
