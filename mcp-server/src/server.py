@@ -1,6 +1,7 @@
 import glob
 import logging
 import os
+import sqlite3
 from contextlib import asynccontextmanager
 
 import uvicorn
@@ -8,6 +9,7 @@ from mcp.server.fastmcp import FastMCP
 from starlette.responses import JSONResponse
 
 import tools
+from config import config
 from repository.sqlite import SqliteIngester, SqliteRepository
 
 logging.basicConfig(
@@ -16,24 +18,32 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+SHARED_MEMORY_URI = "file:data?mode=memory&cache=shared"
+
 
 @asynccontextmanager
 async def server_lifespan(server: FastMCP):
-    db_path = os.environ.get("DB_PATH", "/app/db/data.db")
-    data_dir = os.environ.get("DATA_DIR", "/app/data")
-    logger.info("Starting server (db_path=%s, data_dir=%s)", db_path, data_dir)
-    csv_files = sorted(glob.glob(os.path.join(data_dir, "*.csv")))
-    repository = None
-    if not csv_files:
-        logger.warning("No CSV files found in %s", data_dir)
-    else:
-        csv_path = csv_files[0]
-        logger.info("Ingesting %s", csv_path)
-        ingester = SqliteIngester(db_path)
-        ingest_result = ingester.ingest(csv_path)
-        repository = SqliteRepository(ingest_result.db_path, ingest_result.table_name, ingest_result.columns)
-        logger.info("Ingestion complete, repository ready")
-    yield {"repository": repository}
+    data_dir = config.data_dir
+    logger.info("Starting server (data_dir=%s)", data_dir)
+
+    # Keeper connection: holds the shared in-memory DB alive for the server's lifetime.
+    # All data is ingested once at startup; concurrent writes are not expected.
+    keeper_conn = sqlite3.connect(SHARED_MEMORY_URI, uri=True)
+    try:
+        csv_files = sorted(glob.glob(os.path.join(data_dir, "*.csv")))
+        repository = None
+        if not csv_files:
+            logger.warning("No CSV files found in %s", data_dir)
+        else:
+            csv_path = csv_files[0]
+            logger.info("Ingesting %s", csv_path)
+            ingester = SqliteIngester(SHARED_MEMORY_URI)
+            ingest_result = ingester.ingest(csv_path)
+            repository = SqliteRepository(SHARED_MEMORY_URI, ingest_result.table_name, ingest_result.columns)
+            logger.info("Ingestion complete, repository ready")
+        yield {"repository": repository}
+    finally:
+        keeper_conn.close()
 
 
 mcp_server = FastMCP(

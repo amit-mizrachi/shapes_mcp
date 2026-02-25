@@ -6,8 +6,8 @@ from .base import LLMClient, LLMResponse, ToolCall
 
 
 class ClaudeLLMClient(LLMClient):
-    def __init__(self, api_key: str, model: str):
-        self._client = anthropic.AsyncAnthropic(api_key=api_key)
+    def __init__(self, model: str):
+        self._client = anthropic.AsyncAnthropic()
         self._model = model
 
     def _convert_tools(self, mcp_tools: list[dict]) -> list[dict]:

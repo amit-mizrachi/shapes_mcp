@@ -28,7 +28,6 @@ class QueryResult:
 class IngestResult:
     table_name: str
     columns: list[ColumnInfo]
-    db_path: str
 
 
 @runtime_checkable

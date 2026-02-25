@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import sqlite3
 
 from repository.csv_parser import parse_csv
@@ -11,14 +10,13 @@ logger = logging.getLogger(__name__)
 
 
 class SqliteIngester:
-    def __init__(self, db_path: str) -> None:
-        self._db_path = db_path
+    def __init__(self, db_uri: str) -> None:
+        self._db_uri = db_uri
 
     def ingest(self, csv_path: str) -> IngestResult:
         parsed = parse_csv(csv_path)
 
-        os.makedirs(os.path.dirname(self._db_path), exist_ok=True)
-        conn = sqlite3.connect(self._db_path)
+        conn = sqlite3.connect(self._db_uri, uri=True)
         cursor = conn.cursor()
 
         column_definitions = ", ".join(
@@ -46,5 +44,4 @@ class SqliteIngester:
         return IngestResult(
             table_name=parsed.table_name,
             columns=parsed.columns,
-            db_path=self._db_path,
         )

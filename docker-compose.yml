@@ -1,6 +1,8 @@
 services:
   mcp-server:
-    build: ./mcp-server
+    build:
+      context: .
+      dockerfile: mcp-server/Dockerfile
     expose:
       - "3001"
     volumes:
@@ -19,11 +21,12 @@ services:
         max-file: "3"
 
   chat-backend:
-    build: ./chat-backend
+    build:
+      context: .
+      dockerfile: chat-backend/Dockerfile
     expose:
       - "3002"
     environment:
-      - MCP_SERVER_URL=http://mcp-server:3001/mcp
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     depends_on:
       mcp-server:

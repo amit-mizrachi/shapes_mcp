@@ -4,12 +4,13 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY mcp-server/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY src/ .
+COPY shared/config.py ./config.py
+COPY mcp-server/src/ .
 
-RUN mkdir -p /app/db && chown -R appuser:appuser /app
+RUN chown -R appuser:appuser /app
 
 USER appuser
 

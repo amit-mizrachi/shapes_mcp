@@ -17,15 +17,17 @@ FILTER_SUFFIX_TO_SQL_OPERATOR = {
 
 
 class SqliteRepository:
-    def __init__(self, db_path: str, table_name: str, columns: list[ColumnInfo]) -> None:
-        self._db_path = db_path
+    def __init__(self, db_uri: str, table_name: str, columns: list[ColumnInfo]) -> None:
+        self._db_uri = db_uri
         self._table_name = table_name
         self._columns = columns
         self._valid_columns = {c.name for c in columns}
         self._col_types = {c.name: c.detected_type for c in columns}
 
     async def _open_readonly_connection(self) -> aiosqlite.Connection:
-        conn = await aiosqlite.connect(f"file:{self._db_path}?mode=ro", uri=True)
+        # Shared-cache in-memory connections must be read-write; query_only pragma provides read-only safety
+        conn = await aiosqlite.connect(self._db_uri, uri=True)
+        await conn.execute("PRAGMA query_only = ON")
         conn.row_factory = aiosqlite.Row
         return conn
 

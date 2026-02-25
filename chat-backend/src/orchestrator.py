@@ -6,8 +6,8 @@ import logging
 from dataclasses import dataclass, field
 
 from llm.base import LLMClient
-from mcp_client import MCPClient
-from mcp_client_manager import MCPClientManager
+from mcp.mcp_client import MCPClient
+from mcp.mcp_client_manager import MCPClientManager
 
 logger = logging.getLogger(__name__)
 

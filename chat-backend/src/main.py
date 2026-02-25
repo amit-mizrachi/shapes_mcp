@@ -8,15 +8,14 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from config import Settings
+from config import config
 from orchestrator import ChatOrchestrator
-from mcp_client_manager import MCPClientManager
+from mcp.mcp_client_manager import MCPClientManager
 from llm.claude import ClaudeLLMClient
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-settings = Settings()
 mcp_manager: MCPClientManager | None = None
 orchestrator: ChatOrchestrator | None = None
 
@@ -26,14 +25,14 @@ async def lifespan(app: FastAPI):
     global mcp_manager, orchestrator
 
     mcp_manager = MCPClientManager(
-        url=settings.MCP_SERVER_URL,
-        max_concurrent=settings.MCP_MAX_CONCURRENT,
+        url=config.mcp_server_url,
+        max_concurrent=config.mcp_max_concurrent,
     )
 
     for attempt in range(10):
         try:
             await mcp_manager.initialize()
-            logger.info("MCP client ready (max_concurrent=%d)", settings.MCP_MAX_CONCURRENT)
+            logger.info("MCP client ready (max_concurrent=%d)", config.mcp_max_concurrent)
             break
         except Exception as e:
             logger.warning("MCP init attempt %d/10 failed: %s", attempt + 1, e)
@@ -42,12 +41,9 @@ async def lifespan(app: FastAPI):
             else:
                 raise RuntimeError("Could not connect to MCP server") from e
 
-    llm_client = ClaudeLLMClient(
-        api_key=settings.ANTHROPIC_API_KEY,
-        model=settings.ANTHROPIC_MODEL,
-    )
+    llm_client = ClaudeLLMClient(model=config.anthropic_model)
     orchestrator = ChatOrchestrator(llm_client, mcp_manager)
-    logger.info("Chat backend started. MCP server URL: %s", settings.MCP_SERVER_URL)
+    logger.info("Chat backend started. MCP server URL: %s", config.mcp_server_url)
     yield
 
 
