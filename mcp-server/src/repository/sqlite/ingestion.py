@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-import logging
 import sqlite3
 
-from repository.csv_parser import parse_csv
+from repository.csv_parser import CSVParser
 from repository.models import IngestResult
-
-logger = logging.getLogger(__name__)
 
 
 class SqliteIngester:
@@ -14,10 +11,10 @@ class SqliteIngester:
         self._db_uri = db_uri
 
     def ingest(self, csv_path: str) -> IngestResult:
-        parsed = parse_csv(csv_path)
+        parsed = CSVParser.parse(csv_path)
 
-        conn = sqlite3.connect(self._db_uri, uri=True)
-        cursor = conn.cursor()
+        connection = sqlite3.connect(self._db_uri, uri=True)
+        cursor = connection.cursor()
 
         column_definitions = ", ".join(
             f'"{c.name}" {"REAL" if c.detected_type == "numeric" else "TEXT"}'
@@ -31,15 +28,8 @@ class SqliteIngester:
             values = [row[h] for h in parsed.headers]
             cursor.execute(f'INSERT INTO "{parsed.table_name}" VALUES ({placeholders})', values)
 
-        conn.commit()
-        conn.close()
-
-        logger.info(
-            "Ingested %d rows into table '%s' (%d columns)",
-            len(parsed.rows),
-            parsed.table_name,
-            len(parsed.columns),
-        )
+        connection.commit()
+        connection.close()
 
         return IngestResult(
             table_name=parsed.table_name,

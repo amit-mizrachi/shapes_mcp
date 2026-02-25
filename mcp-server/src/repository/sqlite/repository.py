@@ -91,7 +91,7 @@ class SqliteRepository:
             row_dicts = [dict(zip(columns, row)) for row in rows]
             return QueryResult(columns=columns, rows=row_dicts, count=len(row_dicts))
         except Exception:
-            logger.error("select_rows query failed (sql=%s)", sql, exc_info=True)
+            logger.error("select_rows query failed", exc_info=True)
             raise
         finally:
             await conn.close()
@@ -146,7 +146,7 @@ class SqliteRepository:
             row_dicts = [dict(zip(columns, row)) for row in rows]
             return QueryResult(columns=columns, rows=row_dicts, count=len(row_dicts))
         except Exception:
-            logger.error("aggregate query failed (sql=%s)", sql, exc_info=True)
+            logger.error("aggregate query failed", exc_info=True)
             raise
         finally:
             await conn.close()

@@ -24,7 +24,7 @@ SHARED_MEMORY_URI = "file:data?mode=memory&cache=shared"
 @asynccontextmanager
 async def server_lifespan(server: FastMCP):
     data_dir = config.data_dir
-    logger.info("Starting server (data_dir=%s)", data_dir)
+    logger.info("Starting MCP server")
 
     # Keeper connection: holds the shared in-memory DB alive for the server's lifetime.
     # All data is ingested once at startup; concurrent writes are not expected.
@@ -33,14 +33,13 @@ async def server_lifespan(server: FastMCP):
         csv_files = sorted(glob.glob(os.path.join(data_dir, "*.csv")))
         repository = None
         if not csv_files:
-            logger.warning("No CSV files found in %s", data_dir)
+            logger.warning("No CSV files found")
         else:
             csv_path = csv_files[0]
-            logger.info("Ingesting %s", csv_path)
+            logger.info("Ingesting CSV data")
             ingester = SqliteIngester(SHARED_MEMORY_URI)
             ingest_result = ingester.ingest(csv_path)
             repository = SqliteRepository(SHARED_MEMORY_URI, ingest_result.table_name, ingest_result.columns)
-            logger.info("Ingestion complete, repository ready")
         yield {"repository": repository}
     finally:
         keeper_conn.close()

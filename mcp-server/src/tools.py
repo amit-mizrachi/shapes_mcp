@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 def _get_repository(ctx: Context) -> DataRepository:
     repository = ctx.request_context.lifespan_context.get("repository")
     if repository is None:
-        logger.error("Repository not initialized — no data was loaded at startup")
+        logger.error("Repository not initialized")
         raise RuntimeError("Repository not initialized")
     return repository
 
@@ -29,7 +29,6 @@ async def get_schema(ctx: Context) -> str:
     if schema is None:
         logger.warning("get_schema called but no data is loaded")
         return json.dumps({"error": "No data loaded"})
-    logger.debug("get_schema returning %d columns", len(schema.columns))
     return json.dumps(
         {
             "table": schema.table_name,
@@ -56,14 +55,13 @@ async def select_rows(
       Example: {"age_gt": 30, "city": "London"}
     - limit: max rows to return (default 20, max 100).
     """
-    logger.info("select_rows called (filters=%s, fields=%s, limit=%d)", filters, fields, limit)
+    logger.info("Executing select_rows")
     repository = _get_repository(ctx)
     try:
         query_result = await repository.select_rows(filters=filters, fields=fields, limit=limit)
     except ValueError as e:
-        logger.warning("select_rows validation error: %s", e)
+        logger.warning("select_rows validation failed")
         return json.dumps({"error": str(e)})
-    logger.debug("select_rows returning %d rows", query_result.count)
     return json.dumps({"data": query_result.rows, "count": query_result.count})
 
 
@@ -83,12 +81,11 @@ async def aggregate(
     - filters: dict of conditions, same syntax as select_rows.
     - limit: max groups to return when using group_by (default 20, max 100).
     """
-    logger.info("aggregate called (op=%s, field=%s, group_by=%s, filters=%s, limit=%d)", op, field, group_by, filters, limit)
+    logger.info("Executing aggregate")
     repository = _get_repository(ctx)
     try:
         query_result = await repository.aggregate(op=op, field=field, group_by=group_by, filters=filters, limit=limit)
     except ValueError as e:
-        logger.warning("aggregate validation error: %s", e)
+        logger.warning("aggregate validation failed")
         return json.dumps({"error": str(e)})
-    logger.debug("aggregate returning %d rows", query_result.count)
     return json.dumps({"data": query_result.rows, "count": query_result.count})

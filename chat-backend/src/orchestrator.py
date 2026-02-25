@@ -6,8 +6,8 @@ import logging
 from dataclasses import dataclass, field
 
 from llm.base import LLMClient
-from mcp.mcp_client import MCPClient
-from mcp.mcp_client_manager import MCPClientManager
+from mcp_layer.mcp_client import MCPClient
+from mcp_layer.mcp_client_manager import MCPClientManager
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ class ChatOrchestrator:
         except asyncio.TimeoutError:
             return ChatResult(answer="The request timed out. Please try a simpler question.")
         except Exception as e:
-            logger.error("Orchestrator error: %s", e, exc_info=True)
+            logger.error("Orchestration loop failed", exc_info=True)
             raise
 
     async def _run_loop(self, mcp: MCPClient, user_messages: list[dict]) -> ChatResult:
@@ -91,7 +91,7 @@ class ChatOrchestrator:
                 try:
                     result_text = await mcp.call_tool(tc.name, tc.arguments)
                 except Exception as e:
-                    logger.error("Tool call %s failed: %s", tc.name, e)
+                    logger.error("Tool call failed", exc_info=True)
                     result_text = json.dumps({"error": "Tool execution failed. Please try a different approach."})
 
                 trace.append({

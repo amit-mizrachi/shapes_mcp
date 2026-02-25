@@ -5,7 +5,7 @@ import logging
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 
-from mcp_client import MCPClient
+from .mcp_client import MCPClient
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +21,8 @@ class MCPClientManager:
     async def initialize(self) -> None:
         """Fetch and cache tool definitions once at startup."""
         async with MCPClient(self._url) as client:
+            logger.info("Caching MCP tools")
             self._tools = await client.list_tools()
-        logger.info("MCP tools cached: %s", [t["name"] for t in self._tools])
 
     def get_tools(self) -> list[dict]:
         return self._tools

@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from config import config
 from orchestrator import ChatOrchestrator
-from mcp.mcp_client_manager import MCPClientManager
+from mcp_layer.mcp_client_manager import MCPClientManager
 from llm.claude import ClaudeLLMClient
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -32,10 +32,10 @@ async def lifespan(app: FastAPI):
     for attempt in range(10):
         try:
             await mcp_manager.initialize()
-            logger.info("MCP client ready (max_concurrent=%d)", config.mcp_max_concurrent)
+            logger.info("MCP client ready")
             break
         except Exception as e:
-            logger.warning("MCP init attempt %d/10 failed: %s", attempt + 1, e)
+            logger.warning("MCP connection attempt failed, retrying")
             if attempt < 9:
                 await asyncio.sleep(3)
             else:
@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI):
 
     llm_client = ClaudeLLMClient(model=config.anthropic_model)
     orchestrator = ChatOrchestrator(llm_client, mcp_manager)
-    logger.info("Chat backend started. MCP server URL: %s", config.mcp_server_url)
+    logger.info("Chat backend started")
     yield
 
 
@@ -88,11 +88,10 @@ async def chat(request: ChatRequest):
         result = await orchestrator.chat(messages)
         return ChatResponse(answer=result.answer, tool_calls=result.tool_calls)
     except ConnectionError as e:
-        logger.warning("MCP connection error: %s", e)
+        logger.warning("MCP connection error")
         raise HTTPException(status_code=503, detail="Server busy. Please try again shortly.")
     except Exception as e:
-        error_type = type(e).__name__
-        logger.error("Chat error (%s): %s", error_type, e, exc_info=True)
+        logger.error("Chat request failed", exc_info=True)
         if "rate_limit" in str(e).lower() or "429" in str(e):
             raise HTTPException(status_code=429, detail="Rate limit reached. Please wait and try again.")
         raise HTTPException(status_code=500, detail="An internal error occurred.")
