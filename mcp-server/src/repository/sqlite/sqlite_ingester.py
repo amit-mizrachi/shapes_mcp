@@ -31,9 +31,10 @@ class SqliteIngester:
         cursor.execute(f'DROP TABLE IF EXISTS "{parsed.table_name}"')
         cursor.execute(f'CREATE TABLE "{parsed.table_name}" ({column_definitions})')
 
+        column_types = {c.name: c.detected_type for c in parsed.columns}
         placeholders = ", ".join("?" for _ in parsed.headers)
         for row in parsed.rows:
-            values = [row[h] for h in parsed.headers]
+            values = [self._convert_value(row[h], column_types[h]) for h in parsed.headers]
             cursor.execute(f'INSERT INTO "{parsed.table_name}" VALUES ({placeholders})', values)
 
         connection.commit()
@@ -43,3 +44,15 @@ class SqliteIngester:
             table_name=parsed.table_name,
             columns=parsed.columns,
         )
+
+    @staticmethod
+    def _convert_value(value: str, detected_type: str) -> float | None | str:
+        if detected_type != "numeric":
+            return value
+        stripped = value.strip()
+        if not stripped:
+            return None
+        try:
+            return float(stripped)
+        except ValueError:
+            return None

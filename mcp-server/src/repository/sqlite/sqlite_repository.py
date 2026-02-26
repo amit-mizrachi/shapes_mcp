@@ -21,7 +21,6 @@ class SqliteRepository:
         self._table_name = table_name
         self._columns = columns
         self._valid_columns = {c.name for c in columns}
-        self._column_types = {c.name: c.detected_type for c in columns}
 
     async def get_schema(self) -> Optional[TableSchema]:
         if not self._columns:
@@ -96,8 +95,6 @@ class SqliteRepository:
         if filter_condition.op == "IN":
             placeholders = ",".join("?" * len(filter_condition.value))
             return f'"{filter_condition.column}" IN ({placeholders})'
-        if self._column_types.get(filter_condition.column) == "numeric" and filter_condition.op != "=":
-            return f'CAST("{filter_condition.column}" AS REAL) {filter_condition.op} ?'
         return f'"{filter_condition.column}" {filter_condition.op} ?'
 
     def _build_order_clause(self, order_by: Optional[str], order: str) -> str:
@@ -121,7 +118,7 @@ class SqliteRepository:
     def _build_aggregation_expression(self, sql_operation: str, field: Optional[str]) -> str:
         if sql_operation == "COUNT":
             return "COUNT(*)"
-        return f'{sql_operation}(CAST("{field}" AS REAL))'
+        return f'{sql_operation}("{field}")'
 
     def _build_aggregated_sql_query(self, aggregation_expression, where_clause, params, group_by, limit, order_by, order):
         if not group_by:
