@@ -13,15 +13,14 @@ from shared.modules.api.chat_response import ChatResponse
 def app_with_mocks():
     """Import and configure the FastAPI app with mocked dependencies."""
     with patch("server.MCPClientManager") as mock_mgr_cls, \
-         patch("server.ClaudeLLMClient") as mock_llm_cls, \
+         patch("server.create_llm_client") as mock_create_llm, \
          patch("server.AgentLoopOrchestrator") as mock_uc_cls:
 
         mock_mgr = MagicMock()
         mock_mgr.initialize = AsyncMock()
         mock_mgr_cls.return_value = mock_mgr
 
-        mock_llm = MagicMock()
-        mock_llm_cls.return_value = mock_llm
+        mock_create_llm.return_value = MagicMock()
 
         mock_uc = MagicMock()
         mock_uc.execute = AsyncMock(return_value=ChatResponse(answer="Test reply"))

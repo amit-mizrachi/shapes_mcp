@@ -14,8 +14,7 @@ from shared.config import Config
 from shared.modules.api.chat_request import ChatRequest
 from shared.modules.api.chat_response import ChatResponse
 from agent_loop_orchestrator import AgentLoopOrchestrator
-from llm_clients.claude_llm_client import ClaudeLLMClient
-from llm_clients.gemini_llm_client import GeminiLLMClient
+from llm_clients.llm_client_factory import create_llm_client
 from mcp_client.mcp_client_manager import MCPClientManager
 
 _MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "http://mcp-server:3001/mcp")
@@ -52,17 +51,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             logger.warning("MCP connection attempt %d/%d failed, retrying in %ds...", attempt, _RETRY_ATTEMPTS, _RETRY_SLEEP)
             await asyncio.sleep(_RETRY_SLEEP)
 
-    provider = Config.get("chat_server.llm_provider")
-    if provider == "gemini":
-        llm_client = GeminiLLMClient(
-            model=Config.get("chat_server.gemini_model"),
-            max_tokens=Config.get("chat_server.gemini_max_tokens"),
-        )
-    else:
-        llm_client = ClaudeLLMClient(
-            model=Config.get("chat_server.anthropic_model"),
-            max_tokens=Config.get("chat_server.max_tokens"),
-        )
+    llm_client = create_llm_client(Config.get("chat_server.llm_provider"))
 
     app.state.orchestrator = AgentLoopOrchestrator(
         llm_client=llm_client,
