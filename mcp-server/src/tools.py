@@ -12,39 +12,6 @@ from repository.data_repository import DataRepository
 logger = logging.getLogger(__name__)
 
 
-def _get_repository(ctx: Context) -> DataRepository:
-    repository = ctx.request_context.lifespan_context.get("repository")
-    if repository is None:
-        logger.error("Repository not initialized")
-        raise RuntimeError("Repository not initialized")
-    return repository
-
-
-_VALID_OPS = frozenset({"=", ">", ">=", "<", "<=", "LIKE", "IN"})
-
-
-def _parse_filters(raw: list[dict] | None) -> list[FilterCondition] | None:
-    if not raw:
-        return None
-    conditions: list[FilterCondition] = []
-    for item in raw:
-        column = item.get("column")
-        if not column or not isinstance(column, str):
-            raise ValueError(f"Each filter must have a string 'column'. Got: {item!r}")
-        op = item.get("op", "=").upper()
-        if op not in _VALID_OPS:
-            raise ValueError(f"Invalid filter op '{op}'. Must be one of: {sorted(_VALID_OPS)}")
-        value = item.get("value", "")
-        if op == "IN":
-            if not isinstance(value, list) or len(value) == 0:
-                raise ValueError(f"IN operator requires a non-empty list for 'value'. Got: {value!r}")
-        elif op == "LIKE":
-            if not isinstance(value, str):
-                raise ValueError(f"LIKE operator requires a string 'value'. Got: {value!r}")
-        conditions.append(FilterCondition(column=column, op=op, value=value))
-    return conditions
-
-
 async def get_schema(ctx: Context) -> str:
     """Return the database schema: table name, column names, detected types, and sample values.
 
@@ -66,7 +33,6 @@ async def get_schema(ctx: Context) -> str:
         },
         indent=2,
     )
-
 
 async def select_rows(
     filters: list[dict] | None = None,
@@ -110,7 +76,7 @@ async def select_rows(
 
 
 async def aggregate(
-    op: str,
+    operation: str,
     field: str | None = None,
     group_by: str | None = None,
     filters: list[dict] | None = None,
@@ -121,7 +87,7 @@ async def aggregate(
 ) -> str:
     """Run an aggregation on the data table.
 
-    - op: one of "count", "sum", "avg", "min", "max".
+    - operation: one of "count", "sum", "avg", "min", "max".
     - field: column to aggregate (not required for "count").
     - group_by: optional column to group results by.
     - filters: list of filter objects, same format as select_rows.
@@ -138,10 +104,34 @@ async def aggregate(
     try:
         parsed_filters = _parse_filters(filters)
         query_result = await repository.aggregate(
-            operation=op, field=field, group_by=group_by, filters=parsed_filters, limit=limit,
+            operation=operation, field=field, group_by=group_by, filters=parsed_filters, limit=limit,
             order_by=order_by, order=order,
         )
     except ValueError as e:
         logger.warning("aggregate validation failed")
         return json.dumps({"error": str(e)})
     return json.dumps({"data": query_result.rows, "count": query_result.count})
+
+def _get_repository(ctx: Context) -> DataRepository:
+    repository = ctx.request_context.lifespan_context.get("repository")
+    if repository is None:
+        logger.error("Repository not initialized")
+        raise RuntimeError("Repository not initialized")
+    return repository
+
+
+def _parse_filters(raw: list[dict] | None) -> list[FilterCondition] | None:
+    if not raw:
+        return None
+    conditions: list[FilterCondition] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            raise ValueError(f"Each filter must be a dict. Got: {type(item).__name__}")
+        conditions.append(
+            FilterCondition(
+                column=item.get("column", ""),
+                op=item.get("op", "=").upper(),
+                value=item.get("value", ""),
+            )
+        )
+    return conditions

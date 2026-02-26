@@ -15,9 +15,6 @@ from shared.modules.table_schema import TableSchema
 
 logger = logging.getLogger(__name__)
 
-VALID_SQL_OPS = {"=", ">", ">=", "<", "<=", "LIKE", "IN"}
-
-
 class SqliteRepository:
     def __init__(self, db_uri: str, table_name: str, columns: list[ColumnInfo]) -> None:
         self._db_uri = db_uri
@@ -59,9 +56,9 @@ class SqliteRepository:
         order_by: Optional[str] = None,
         order: str = "desc",
     ) -> QueryResult:
-        operation = self._validate_aggregation_args(operation, field, group_by)
+        sql_operation = self._validate_aggregation_args(operation, field, group_by)
         where_clause, params = self._build_where_clause(filters)
-        aggregation_expression = self._build_aggregation_expression(operation, field)
+        aggregation_expression = self._build_aggregation_expression(sql_operation, field)
         sql_query, params = self._build_aggregated_sql_query(
             aggregation_expression, where_clause, params, group_by, limit, order_by, order,
         )
@@ -75,38 +72,33 @@ class SqliteRepository:
             self._validate_column(field_name)
         return ", ".join(f'"{field_name}"' for field_name in fields)
 
-    def _build_where_clause(
-        self,
-        filters: Optional[list[FilterCondition]],
-    ) -> tuple[str, list]:
-        if not filters:
+    def _build_where_clause(self, filter_conditions: Optional[list[FilterCondition]],) -> tuple[str, list]:
+        if not filter_conditions:
             return "", []
         parts: list[str] = []
         params: list = []
-        for filter in filters:
-            self._validate_filter(filter)
-            parts.append(self._filter_to_sql_expression(filter))
-            if filter.op == "IN":
-                params.extend(filter.value)
+        for filter_condition in filter_conditions:
+            self._validate_filter(filter_condition)
+            parts.append(self._filter_to_sql_expression(filter_condition))
+            if filter_condition.op == "IN":
+                params.extend(filter_condition.value)
             else:
-                params.append(filter.value)
+                params.append(filter_condition.value)
         where_clause = " WHERE " + " AND ".join(parts)
         return where_clause, params
 
-    def _validate_filter(self, f: FilterCondition) -> None:
-        self._validate_column(f.column)
-        if f.op not in VALID_SQL_OPS:
-            raise ValueError(f"Unknown filter operator '{f.op}'")
+    def _validate_filter(self, filter_condition: FilterCondition) -> None:
+        self._validate_column(filter_condition.column)
 
-    def _filter_to_sql_expression(self, f: FilterCondition) -> str:
-        if f.op == "LIKE":
-            return f'"{f.column}" LIKE ?'
-        if f.op == "IN":
-            placeholders = ",".join("?" * len(f.value))
-            return f'"{f.column}" IN ({placeholders})'
-        if self._column_types.get(f.column) == "numeric" and f.op != "=":
-            return f'CAST("{f.column}" AS REAL) {f.op} ?'
-        return f'"{f.column}" {f.op} ?'
+    def _filter_to_sql_expression(self, filter_condition: FilterCondition) -> str:
+        if filter_condition.op == "LIKE":
+            return f'"{filter_condition.column}" LIKE ?'
+        if filter_condition.op == "IN":
+            placeholders = ",".join("?" * len(filter_condition.value))
+            return f'"{filter_condition.column}" IN ({placeholders})'
+        if self._column_types.get(filter_condition.column) == "numeric" and filter_condition.op != "=":
+            return f'CAST("{filter_condition.column}" AS REAL) {filter_condition.op} ?'
+        return f'"{filter_condition.column}" {filter_condition.op} ?'
 
     def _build_order_clause(self, order_by: Optional[str], order: str) -> str:
         if order_by is None:
@@ -168,8 +160,8 @@ class SqliteRepository:
         finally:
             await connection.close()
 
-    async def _execute_query(self, connection: aiosqlite.Connection, sql: str, params: list) -> QueryResult:
-        cursor = await connection.execute(sql, params)
+    async def _execute_query(self, connection: aiosqlite.Connection, sql_query: str, params: list) -> QueryResult:
+        cursor = await connection.execute(sql_query, params)
         rows = await cursor.fetchall()
         columns = [d[0] for d in cursor.description]
         row_dicts = [dict(zip(columns, row)) for row in rows]
