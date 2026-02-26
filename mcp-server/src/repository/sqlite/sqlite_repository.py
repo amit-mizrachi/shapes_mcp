@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Optional
 
 import aiosqlite
 
@@ -25,107 +26,95 @@ class SqliteRepository:
         self._valid_columns = {c.name for c in columns}
         self._column_types = {c.name: c.detected_type for c in columns}
 
-    @asynccontextmanager
-    async def _connection(self) -> AsyncIterator[aiosqlite.Connection]:
-        # Shared-cache in-memory connections must be read-write; query_only pragma provides read-only safety
-        conn = await aiosqlite.connect(self._db_uri, uri=True)
-        await conn.execute("PRAGMA query_only = ON")
-        conn.row_factory = aiosqlite.Row
-        try:
-            yield conn
-        finally:
-            await conn.close()
-
-    async def _execute_query(self, conn: aiosqlite.Connection, sql: str, params: list) -> QueryResult:
-        cursor = await conn.execute(sql, params)
-        rows = await cursor.fetchall()
-        columns = [d[0] for d in cursor.description]
-        row_dicts = [dict(zip(columns, row)) for row in rows]
-        return QueryResult(columns=columns, rows=row_dicts, count=len(row_dicts))
-
-    def _validate_column(self, column: str) -> None:
-        if column not in self._valid_columns:
-            raise ValueError(f"Column '{column}' not found. Valid columns: {sorted(self._valid_columns)}")
-
-    def _build_where_clause(
-        self,
-        filters: list[FilterCondition] | None,
-    ) -> tuple[str, list]:
-        """Build a WHERE clause from pre-parsed FilterCondition objects."""
-        if not filters:
-            return "", []
-        parts: list[str] = []
-        params: list[str | int | float] = []
-        for f in filters:
-            self._validate_column(f.column)
-            if f.op not in VALID_SQL_OPS:
-                raise ValueError(f"Unknown filter operator '{f.op}'")
-            if self._column_types.get(f.column) == "numeric" and f.op != "=":
-                parts.append(f'CAST("{f.column}" AS REAL) {f.op} ?')
-            else:
-                parts.append(f'"{f.column}" {f.op} ?')
-            params.append(f.value)
-        where_clause = " WHERE " + " AND ".join(parts)
-        return where_clause, params
-
-    async def get_schema(self) -> TableSchema | None:
+    async def get_schema(self) -> Optional[TableSchema]:
         if not self._columns:
             return None
         return TableSchema(table_name=self._table_name, columns=self._columns)
 
     async def select_rows(
         self,
-        filters: list[FilterCondition] | None = None,
-        fields: list[str] | None = None,
+        filters: Optional[list[FilterCondition]] = None,
+        fields: Optional[list[str]] = None,
         limit: int = Config.get("shared.default_query_limit"),
     ) -> QueryResult:
-        if fields:
-            for field_name in fields:
-                self._validate_column(field_name)
-            select_cols = ", ".join(f'"{field_name}"' for field_name in fields)
-        else:
-            select_cols = "*"
-
+        select_columns = self._build_select_columns(fields)
         where_clause, params = self._build_where_clause(filters)
-        sql = f'SELECT {select_cols} FROM "{self._table_name}"{where_clause} LIMIT ?'
+
+        sql_query = f'SELECT {select_columns} FROM "{self._table_name}"{where_clause} LIMIT ?'
         params.append(limit)
 
-        async with self._connection() as conn:
-            try:
-                return await self._execute_query(conn, sql, params)
-            except Exception:
-                logger.error("select_rows query failed", exc_info=True)
-                raise
+        return await self._run_query(sql_query, params)
 
     async def aggregate(
         self,
         operation: str,
-        field: str | None = None,
-        group_by: str | None = None,
-        filters: list[FilterCondition] | None = None,
+        field: Optional[str] = None,
+        group_by: Optional[str] = None,
+        filters: Optional[list[FilterCondition]] = None,
         limit: int = Config.get("shared.default_query_limit"),
     ) -> QueryResult:
+        operation = self._validate_aggregation_args(operation, field, group_by)
+        where_clause, params = self._build_where_clause(filters)
+        aggregation_expression = self._build_aggregation_expression(operation, field)
+
+        sql_query, params = self._build_aggregated_sql_query(aggregation_expression, where_clause, params, group_by, limit)
+
+        return await self._run_query(sql_query, params)
+
+    def _build_select_columns(self, fields: Optional[list[str]]) -> str:
+        if not fields:
+            return "*"
+        for field_name in fields:
+            self._validate_column(field_name)
+        return ", ".join(f'"{field_name}"' for field_name in fields)
+
+    def _build_where_clause(
+        self,
+        filters: Optional[list[FilterCondition]],
+    ) -> tuple[str, list]:
+        if not filters:
+            return "", []
+        parts: list[str] = []
+        params: list[str | int | float] = []
+        for filter in filters:
+            self._validate_filter(filter)
+            parts.append(self._filter_to_sql_expression(filter))
+            params.append(filter.value)
+        where_clause = " WHERE " + " AND ".join(parts)
+        return where_clause, params
+
+    def _validate_filter(self, f: FilterCondition) -> None:
+        self._validate_column(f.column)
+        if f.op not in VALID_SQL_OPS:
+            raise ValueError(f"Unknown filter operator '{f.op}'")
+
+    def _filter_to_sql_expression(self, f: FilterCondition) -> str:
+        if self._column_types.get(f.column) == "numeric" and f.op != "=":
+            return f'CAST("{f.column}" AS REAL) {f.op} ?'
+        return f'"{f.column}" {f.op} ?'
+
+    def _validate_aggregation_args(self, operation: str, field: Optional[str], group_by: Optional[str]) -> str:
         sql_operation = operation.upper()
         if sql_operation not in ("COUNT", "SUM", "AVG", "MIN", "MAX"):
             raise ValueError(
                 f"Unsupported aggregation op: {operation}. Use count, sum, avg, min, or max."
             )
-
         if sql_operation != "COUNT":
             if not field:
                 raise ValueError(f"'field' is required for {operation}.")
             self._validate_column(field)
-
         if group_by:
             self._validate_column(group_by)
+        return sql_operation
 
-        where_clause, params = self._build_where_clause(filters)
-
+    def _build_aggregation_expression(self, sql_operation: str, field: Optional[str]) -> str:
         if sql_operation == "COUNT":
-            aggregation_expression = "COUNT(*)"
-        else:
-            aggregation_expression = f'{sql_operation}(CAST("{field}" AS REAL))'
+            return "COUNT(*)"
+        return f'{sql_operation}(CAST("{field}" AS REAL))'
 
+    def _build_aggregated_sql_query(
+        self, aggregation_expression: str, where_clause: str, params: list, group_by: Optional[str], limit: int,
+    ) -> tuple[str, list]:
         if group_by:
             sql = (
                 f'SELECT "{group_by}", {aggregation_expression} AS result '
@@ -135,10 +124,34 @@ class SqliteRepository:
             params.append(limit)
         else:
             sql = f'SELECT {aggregation_expression} AS result FROM "{self._table_name}"{where_clause}'
+        return sql, params
 
-        async with self._connection() as conn:
+    def _validate_column(self, column: str) -> None:
+        if column not in self._valid_columns:
+            raise ValueError(f"Column '{column}' not found. Valid columns: {sorted(self._valid_columns)}")
+
+    async def _run_query(self, sql_query: str, params: list) -> QueryResult:
+        async with self._connection() as connection:
             try:
-                return await self._execute_query(conn, sql, params)
+                return await self._execute_query(connection, sql_query, params)
             except Exception:
-                logger.error("aggregate query failed", exc_info=True)
+                logger.error("query failed")
                 raise
+
+    @asynccontextmanager
+    async def _connection(self) -> AsyncIterator[aiosqlite.Connection]:
+        # Shared-cache in-memory connections must be read-write; query_only pragma provides read-only safety
+        connection = await aiosqlite.connect(self._db_uri, uri=True)
+        await connection.execute("PRAGMA query_only = ON")
+        connection.row_factory = aiosqlite.Row
+        try:
+            yield connection
+        finally:
+            await connection.close()
+
+    async def _execute_query(self, connection: aiosqlite.Connection, sql: str, params: list) -> QueryResult:
+        cursor = await connection.execute(sql, params)
+        rows = await cursor.fetchall()
+        columns = [d[0] for d in cursor.description]
+        row_dicts = [dict(zip(columns, row)) for row in rows]
+        return QueryResult(columns=columns, rows=row_dicts, count=len(row_dicts))
