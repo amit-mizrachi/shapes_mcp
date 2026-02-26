@@ -3,49 +3,66 @@ from __future__ import annotations
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from typing import Annotated
+from collections.abc import AsyncIterator
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from shared.config import Config
-from chat_orchestrator import ChatOrchestrator
 from shared.modules.api.chat_request import ChatRequest
 from shared.modules.api.chat_response import ChatResponse
-from mcp_client.mcp_client_manager import MCPClientManager
+from chat_use_case import ChatUseCase
 from llm_client.claude.claude_llm_client import ClaudeLLMClient
+from mcp_client.mcp_client_manager import MCPClientManager
 
-logging.basicConfig(level=Config.get("shared.log_level"), format=Config.get("shared.log_format"))
+logging.basicConfig(
+    level=Config.get("shared.log_level"),
+    format=Config.get("shared.log_format"),
+)
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # Wire dependencies
     mcp_manager = MCPClientManager(
         url=Config.get("chat_server.mcp_server_url"),
         max_concurrent=Config.get("chat_server.mcp_max_concurrent"),
+        semaphore_timeout=Config.get("chat_server.semaphore_timeout"),
     )
 
     retry_attempts = Config.get("chat_server.retry_attempts")
-    for attempt in range(retry_attempts):
+    retry_sleep = Config.get("chat_server.retry_sleep")
+    for attempt in range(1, retry_attempts + 1):
         try:
             await mcp_manager.initialize()
-            logger.info("MCP client ready")
+            logger.info("MCP connection established (attempt %d)", attempt)
             break
-        except Exception as e:
-            logger.warning("MCP connection attempt failed, retrying")
-            if attempt < retry_attempts - 1:
-                await asyncio.sleep(Config.get("chat_server.retry_sleep"))
-            else:
-                raise RuntimeError("Could not connect to MCP server") from e
+        except Exception:
+            if attempt == retry_attempts:
+                logger.error("Failed to connect to MCP server after %d attempts", retry_attempts)
+                raise
+            logger.warning("MCP connection attempt %d/%d failed, retrying in %ds...", attempt, retry_attempts, retry_sleep)
+            await asyncio.sleep(retry_sleep)
 
-    llm_client = ClaudeLLMClient(model=Config.get("chat_server.anthropic_model"))
-    app.state.orchestrator = ChatOrchestrator(llm_client, mcp_manager)
-    logger.info("Chat server started")
+    llm_client = ClaudeLLMClient(
+        model=Config.get("chat_server.anthropic_model"),
+        max_tokens=Config.get("chat_server.max_tokens"),
+    )
+
+    app.state.chat_use_case = ChatUseCase(
+        llm_client=llm_client,
+        mcp_manager=mcp_manager,
+        system_prompt=Config.get("chat_server.system_prompt"),
+        max_iterations=Config.get("chat_server.max_iterations"),
+    )
+    app.state.timeout = Config.get("chat_server.timeout_seconds")
+
     yield
 
 
-app = FastAPI(title="Chat Server", lifespan=lifespan)
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -55,34 +72,21 @@ app.add_middleware(
 )
 
 
-def get_orchestrator(request: Request) -> ChatOrchestrator:
-    return request.app.state.orchestrator
-
-
-Orchestrator = Annotated[ChatOrchestrator, Depends(get_orchestrator)]
-
-
 @app.get("/health")
 async def health():
     return {"status": "ok"}
 
 
 @app.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest, orchestrator: Orchestrator):
-    max_length = Config.get("chat_server.message_max_length")
-    for msg in request.messages:
-        if len(msg.content) > max_length:
-            raise HTTPException(status_code=422, detail=f"Message content exceeds {max_length} character limit.")
-
-    messages = [{"role": m.role, "content": m.content} for m in request.messages]
-
+async def chat(request: ChatRequest, raw_request: Request):
     try:
-        return await orchestrator.chat(messages)
-    except ConnectionError as e:
-        logger.warning("MCP connection error")
-        raise HTTPException(status_code=503, detail="Server busy. Please try again shortly.")
-    except Exception as e:
-        logger.error("Chat request failed", exc_info=True)
-        if "rate_limit" in str(e).lower() or "429" in str(e):
-            raise HTTPException(status_code=429, detail="Rate limit reached. Please wait and try again.")
-        raise HTTPException(status_code=500, detail="An internal error occurred.")
+        response = await asyncio.wait_for(
+            raw_request.app.state.chat_use_case.execute(request),
+            timeout=raw_request.app.state.timeout,
+        )
+        return response
+    except asyncio.TimeoutError:
+        return JSONResponse(status_code=504, content={"detail": "Request timed out"})
+    except Exception:
+        logger.exception("Unhandled error in /chat")
+        return JSONResponse(status_code=500, content={"detail": "Internal server error"})

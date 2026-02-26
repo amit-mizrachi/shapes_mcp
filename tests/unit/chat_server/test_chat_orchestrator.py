@@ -1,13 +1,18 @@
-"""Tests for chat-server/src/chat_orchestrator.py — agent loop, timeout, max iterations, tracing."""
+"""Tests for chat-server/src/chat_use_case.py — agent loop, max iterations, tracing."""
 
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
+from shared.modules.api.chat_request import ChatRequest
+from shared.modules.api.message_item import MessageItem
 from shared.modules.llm.llm_response import LLMResponse
 from shared.modules.llm.tool_call import ToolCall
-from chat_orchestrator import ChatOrchestrator
+from chat_use_case import ChatUseCase
+
+
+def _request(content: str = "hello") -> ChatRequest:
+    return ChatRequest(messages=[MessageItem(role="user", content=content)])
 
 
 def _text_response(text: str) -> LLMResponse:
@@ -21,40 +26,30 @@ def _tool_response(tool_name: str = "get_schema", tool_args: dict = None, text: 
     )
 
 
-class TestChat:
+def _make_use_case(llm_client, mcp_manager, max_iterations: int = 10) -> ChatUseCase:
+    return ChatUseCase(
+        llm_client=llm_client,
+        mcp_manager=mcp_manager,
+        system_prompt="You are helpful",
+        max_iterations=max_iterations,
+    )
+
+
+class TestExecute:
     async def test_simple_text_response(self, mock_llm_client, mock_mcp_manager):
-        orch = ChatOrchestrator(mock_llm_client, mock_mcp_manager)
-        result = await orch.chat([{"role": "user", "content": "hello"}])
+        uc = _make_use_case(mock_llm_client, mock_mcp_manager)
+        result = await uc.execute(_request())
         assert result.answer == "Hello!"
         assert result.tool_calls == []
 
-    async def test_timeout_returns_message(self, mock_llm_client, mock_mcp_manager):
-        """If the loop takes too long, return a timeout message."""
-        async def slow_invoke(*args, **kwargs):
-            await asyncio.sleep(10)
-            return _text_response("done")
-
-        mock_llm_client.invoke = slow_invoke
-
-        with patch("chat_orchestrator.Config") as mock_config:
-            mock_config.get = MagicMock(side_effect=lambda k: {
-                "chat_server.timeout_seconds": 0.1,
-                "chat_server.system_prompt": "You are helpful",
-                "chat_server.max_iterations": 10,
-            }[k])
-            orch = ChatOrchestrator(mock_llm_client, mock_mcp_manager)
-            result = await orch.chat([{"role": "user", "content": "hi"}])
-
-        assert "timed out" in result.answer.lower()
-
-    async def test_orchestrator_exception_propagates(self, mock_llm_client, mock_mcp_manager):
+    async def test_exception_propagates(self, mock_llm_client, mock_mcp_manager):
         mock_llm_client.invoke = AsyncMock(side_effect=RuntimeError("LLM crashed"))
-        orch = ChatOrchestrator(mock_llm_client, mock_mcp_manager)
+        uc = _make_use_case(mock_llm_client, mock_mcp_manager)
         with pytest.raises(RuntimeError, match="LLM crashed"):
-            await orch.chat([{"role": "user", "content": "hi"}])
+            await uc.execute(_request())
 
 
-class TestRunLoop:
+class TestAgentLoop:
     async def test_single_tool_call_then_response(self, mock_llm_client, mock_mcp_manager, mock_mcp_client):
         """LLM calls a tool, gets result, then returns text."""
         mock_llm_client.invoke = AsyncMock(side_effect=[
@@ -62,8 +57,8 @@ class TestRunLoop:
             _text_response("The schema has 2 columns."),
         ])
 
-        orch = ChatOrchestrator(mock_llm_client, mock_mcp_manager)
-        result = await orch.chat([{"role": "user", "content": "show schema"}])
+        uc = _make_use_case(mock_llm_client, mock_mcp_manager)
+        result = await uc.execute(_request("show schema"))
 
         assert result.answer == "The schema has 2 columns."
         assert len(result.tool_calls) == 1
@@ -78,8 +73,8 @@ class TestRunLoop:
             _text_response("Found 5 rows."),
         ])
 
-        orch = ChatOrchestrator(mock_llm_client, mock_mcp_manager)
-        result = await orch.chat([{"role": "user", "content": "analyze data"}])
+        uc = _make_use_case(mock_llm_client, mock_mcp_manager)
+        result = await uc.execute(_request("analyze data"))
 
         assert result.answer == "Found 5 rows."
         assert len(result.tool_calls) == 2
@@ -88,14 +83,8 @@ class TestRunLoop:
         """If LLM keeps calling tools beyond max_iterations, return fallback."""
         mock_llm_client.invoke = AsyncMock(return_value=_tool_response("get_schema"))
 
-        with patch("chat_orchestrator.Config") as mock_config:
-            mock_config.get = MagicMock(side_effect=lambda k: {
-                "chat_server.timeout_seconds": 120,
-                "chat_server.system_prompt": "You are helpful",
-                "chat_server.max_iterations": 3,
-            }[k])
-            orch = ChatOrchestrator(mock_llm_client, mock_mcp_manager)
-            result = await orch.chat([{"role": "user", "content": "loop"}])
+        uc = _make_use_case(mock_llm_client, mock_mcp_manager, max_iterations=3)
+        result = await uc.execute(_request("loop"))
 
         assert "maximum number of steps" in result.answer.lower()
         assert len(result.tool_calls) == 3
@@ -108,39 +97,39 @@ class TestRunLoop:
         ])
         mock_mcp_client.call_tool = AsyncMock(side_effect=Exception("Tool failed"))
 
-        orch = ChatOrchestrator(mock_llm_client, mock_mcp_manager)
-        result = await orch.chat([{"role": "user", "content": "query"}])
+        uc = _make_use_case(mock_llm_client, mock_mcp_manager)
+        result = await uc.execute(_request("query"))
 
         assert result.answer == "Sorry, something went wrong."
-        assert "error" in result.tool_calls[0]["result"].lower()
 
     async def test_no_text_in_response(self, mock_llm_client, mock_mcp_manager):
-        """If LLM returns None text with no tool calls, use fallback."""
+        """If LLM returns None text with no tool calls, return empty answer."""
         mock_llm_client.invoke = AsyncMock(return_value=LLMResponse(text=None, tool_calls=[]))
-        orch = ChatOrchestrator(mock_llm_client, mock_mcp_manager)
-        result = await orch.chat([{"role": "user", "content": "hi"}])
-        assert "wasn't able to generate" in result.answer.lower()
+        uc = _make_use_case(mock_llm_client, mock_mcp_manager)
+        result = await uc.execute(_request())
+        assert result.answer == ""
 
-    async def test_trace_records_tool_results(self, mock_llm_client, mock_mcp_manager, mock_mcp_client):
+    async def test_trace_records_tool_calls(self, mock_llm_client, mock_mcp_manager, mock_mcp_client):
         mock_mcp_client.call_tool = AsyncMock(return_value='{"table": "people"}')
         mock_llm_client.invoke = AsyncMock(side_effect=[
             _tool_response("get_schema"),
             _text_response("Done"),
         ])
 
-        orch = ChatOrchestrator(mock_llm_client, mock_mcp_manager)
-        result = await orch.chat([{"role": "user", "content": "schema"}])
+        uc = _make_use_case(mock_llm_client, mock_mcp_manager)
+        result = await uc.execute(_request("schema"))
 
-        assert result.tool_calls[0]["result"] == '{"table": "people"}'
+        assert result.tool_calls[0]["tool"] == "get_schema"
         assert result.tool_calls[0]["arguments"] == {}
 
     async def test_system_prompt_prepended(self, mock_llm_client, mock_mcp_manager):
-        orch = ChatOrchestrator(mock_llm_client, mock_mcp_manager)
-        await orch.chat([{"role": "user", "content": "hi"}])
+        uc = _make_use_case(mock_llm_client, mock_mcp_manager)
+        await uc.execute(_request())
 
         call_args = mock_llm_client.invoke.call_args
         messages = call_args[0][0]
         assert messages[0]["role"] == "system"
+        assert messages[0]["content"] == "You are helpful"
 
     async def test_tool_call_with_text(self, mock_llm_client, mock_mcp_manager, mock_mcp_client):
         """LLM returns both text and tool call in same response."""
@@ -149,6 +138,6 @@ class TestRunLoop:
             _text_response("Schema has 3 columns"),
         ])
 
-        orch = ChatOrchestrator(mock_llm_client, mock_mcp_manager)
-        result = await orch.chat([{"role": "user", "content": "schema"}])
+        uc = _make_use_case(mock_llm_client, mock_mcp_manager)
+        result = await uc.execute(_request("schema"))
         assert result.answer == "Schema has 3 columns"

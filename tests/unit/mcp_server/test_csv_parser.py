@@ -2,7 +2,8 @@
 
 import pytest
 
-from repository.csv_parser import CSVParser, ParsedCSV
+from repository.csv_parser import CSVParser
+from shared.modules.data.parsed_csv import ParsedCSV
 
 
 class TestDetectColumnType:

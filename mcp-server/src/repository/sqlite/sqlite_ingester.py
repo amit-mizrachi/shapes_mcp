@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import sqlite3
 
-from repository.csv_parser import CSVParser, ParsedCSV
-from shared.modules.data.ingest_result import IngestResult
+from repository.csv_parser import CSVParser
+from shared.modules.data.parsed_csv import ParsedCSV
+from shared.modules.data.table_schema import TableSchema
 
 
 class SqliteIngester:
     def __init__(self, db_uri: str) -> None:
         self._db_uri = db_uri
 
-    def ingest(self, csv_path: str) -> IngestResult:
+    def ingest(self, csv_path: str) -> TableSchema:
         parsed_csv = CSVParser.parse(csv_path)
 
         connection = sqlite3.connect(self._db_uri, uri=True)
@@ -21,7 +22,7 @@ class SqliteIngester:
         finally:
             connection.close()
 
-        return IngestResult(table_name=parsed_csv.table_name, columns=parsed_csv.columns)
+        return TableSchema(table_name=parsed_csv.table_name, columns=parsed_csv.columns)
 
     def _create_table(self, connection: sqlite3.Connection, parsed: ParsedCSV) -> None:
         column_defs = ", ".join(

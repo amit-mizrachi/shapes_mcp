@@ -3,15 +3,15 @@ from __future__ import annotations
 import json
 import anthropic
 from llm_client.base_llm_client import BaseLLMClient
-from shared.config import Config
 from shared.modules.llm.llm_response import LLMResponse
 from shared.modules.llm.tool_call import ToolCall
 
 
 class ClaudeLLMClient(BaseLLMClient):
-    def __init__(self, model: str):
+    def __init__(self, model: str, max_tokens: int):
         self._client = anthropic.AsyncAnthropic()
         self._model = model
+        self._max_tokens = max_tokens
 
     def _convert_tools(self, mcp_tools: list[dict]) -> list[dict]:
         """Convert MCP tool schemas to Claude's tool format."""
@@ -36,7 +36,7 @@ class ClaudeLLMClient(BaseLLMClient):
 
         kwargs = {
             "model": self._model,
-            "max_tokens": Config.get("chat_server.max_tokens"),
+            "max_tokens": self._max_tokens,
             "messages": api_messages,
         }
         if system:

@@ -1,5 +1,6 @@
 """Tests for chat-server/src/server.py — FastAPI endpoints: /health, /chat, error codes."""
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -13,7 +14,7 @@ def app_with_mocks():
     """Import and configure the FastAPI app with mocked dependencies."""
     with patch("server.MCPClientManager") as mock_mgr_cls, \
          patch("server.ClaudeLLMClient") as mock_llm_cls, \
-         patch("server.ChatOrchestrator") as mock_orch_cls:
+         patch("server.ChatUseCase") as mock_uc_cls:
 
         mock_mgr = MagicMock()
         mock_mgr.initialize = AsyncMock()
@@ -22,15 +23,17 @@ def app_with_mocks():
         mock_llm = MagicMock()
         mock_llm_cls.return_value = mock_llm
 
-        mock_orch = MagicMock()
-        mock_orch.chat = AsyncMock(return_value=ChatResponse(answer="Test reply"))
-        mock_orch_cls.return_value = mock_orch
+        mock_uc = MagicMock()
+        mock_uc.execute = AsyncMock(return_value=ChatResponse(answer="Test reply"))
+        mock_uc_cls.return_value = mock_uc
 
         import server
-        server.mcp_manager = mock_mgr
-        server.orchestrator = mock_orch
 
-        yield server.app, mock_orch
+        # Manually wire app.state since ASGITransport doesn't trigger lifespan
+        server.app.state.chat_use_case = mock_uc
+        server.app.state.timeout = 120
+
+        yield server.app, mock_uc
 
 
 @pytest.fixture()
@@ -42,9 +45,9 @@ async def client(app_with_mocks):
 
 
 @pytest.fixture()
-def mock_orchestrator(app_with_mocks):
-    _, mock_orch = app_with_mocks
-    return mock_orch
+def mock_use_case(app_with_mocks):
+    _, mock_uc = app_with_mocks
+    return mock_uc
 
 
 class TestHealth:
@@ -55,7 +58,7 @@ class TestHealth:
 
 
 class TestChat:
-    async def test_valid_chat_request(self, client, mock_orchestrator):
+    async def test_valid_chat_request(self, client, mock_use_case):
         resp = await client.post("/chat", json={
             "messages": [{"role": "user", "content": "hello"}]
         })
@@ -72,38 +75,34 @@ class TestChat:
         resp = await client.post("/chat", json={})
         assert resp.status_code == 422
 
-    async def test_message_too_long_returns_422(self, client):
-        long_content = "x" * 5001
-        resp = await client.post("/chat", json={
-            "messages": [{"role": "user", "content": long_content}]
-        })
-        assert resp.status_code == 422
-
-    async def test_connection_error_returns_503(self, client, mock_orchestrator):
-        mock_orchestrator.chat = AsyncMock(side_effect=ConnectionError("MCP down"))
-        resp = await client.post("/chat", json={
-            "messages": [{"role": "user", "content": "hi"}]
-        })
-        assert resp.status_code == 503
-
-    async def test_rate_limit_error_returns_429(self, client, mock_orchestrator):
-        mock_orchestrator.chat = AsyncMock(side_effect=Exception("rate_limit_error 429"))
-        resp = await client.post("/chat", json={
-            "messages": [{"role": "user", "content": "hi"}]
-        })
-        assert resp.status_code == 429
-
-    async def test_generic_error_returns_500(self, client, mock_orchestrator):
-        mock_orchestrator.chat = AsyncMock(side_effect=RuntimeError("unexpected"))
+    async def test_generic_error_returns_500(self, client, mock_use_case):
+        mock_use_case.execute = AsyncMock(side_effect=RuntimeError("unexpected"))
         resp = await client.post("/chat", json={
             "messages": [{"role": "user", "content": "hi"}]
         })
         assert resp.status_code == 500
 
-    async def test_chat_with_tool_calls(self, client, mock_orchestrator):
-        mock_orchestrator.chat = AsyncMock(return_value=ChatResponse(
+    async def test_timeout_returns_504(self, app_with_mocks):
+        app, mock_uc = app_with_mocks
+
+        async def slow_execute(*args, **kwargs):
+            await asyncio.sleep(10)
+            return ChatResponse(answer="done")
+
+        mock_uc.execute = slow_execute
+        app.state.timeout = 0.1
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            resp = await ac.post("/chat", json={
+                "messages": [{"role": "user", "content": "hi"}]
+            })
+        assert resp.status_code == 504
+
+    async def test_chat_with_tool_calls(self, client, mock_use_case):
+        mock_use_case.execute = AsyncMock(return_value=ChatResponse(
             answer="Found data",
-            tool_calls=[{"tool": "get_schema", "result": "ok"}],
+            tool_calls=[{"tool": "get_schema", "arguments": {}}],
         ))
         resp = await client.post("/chat", json={
             "messages": [{"role": "user", "content": "analyze"}]
@@ -112,7 +111,7 @@ class TestChat:
         data = resp.json()
         assert len(data["tool_calls"]) == 1
 
-    async def test_multiple_messages(self, client, mock_orchestrator):
+    async def test_multiple_messages(self, client, mock_use_case):
         resp = await client.post("/chat", json={
             "messages": [
                 {"role": "user", "content": "hello"},
