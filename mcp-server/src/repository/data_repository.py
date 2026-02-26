@@ -16,6 +16,9 @@ class DataRepository(Protocol):
         filters: list[FilterCondition] | None = None,
         fields: list[str] | None = None,
         limit: int = 20,
+        order_by: str | None = None,
+        order: str = "asc",
+        distinct: bool = False,
     ) -> QueryResult: ...
 
     async def aggregate(
@@ -25,4 +28,6 @@ class DataRepository(Protocol):
         group_by: str | None = None,
         filters: list[FilterCondition] | None = None,
         limit: int = 20,
+        order_by: str | None = None,
+        order: str = "desc",
     ) -> QueryResult: ...

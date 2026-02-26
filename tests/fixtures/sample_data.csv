@@ -1,0 +1,6 @@
+Name,Age,City,Score,Active
+Alice,30,New York,95.5,true
+Bob,25,London,87.0,false
+Charlie,35,Paris,92.3,true
+Diana,28,Tokyo,88.1,true
+Eve,42,Berlin,76.9,false

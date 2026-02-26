@@ -70,7 +70,7 @@ class CSVParser:
         column_name_map = dict(zip(raw_columns, sanitized_columns))
         sanitized_rows = [{column_name_map[k]: v for k, v in row.items()} for row in rows]
 
-        return ParsedCSV(
+        return CSVParser.ParsedCSV(
             table_name=table_name,
             columns=columns,
             headers=sanitized_columns,

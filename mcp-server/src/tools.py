@@ -20,7 +20,7 @@ def _get_repository(ctx: Context) -> DataRepository:
     return repository
 
 
-_VALID_OPS = frozenset({"=", ">", ">=", "<", "<="})
+_VALID_OPS = frozenset({"=", ">", ">=", "<", "<=", "LIKE", "IN"})
 
 
 def _parse_filters(raw: list[dict] | None) -> list[FilterCondition] | None:
@@ -31,10 +31,16 @@ def _parse_filters(raw: list[dict] | None) -> list[FilterCondition] | None:
         column = item.get("column")
         if not column or not isinstance(column, str):
             raise ValueError(f"Each filter must have a string 'column'. Got: {item!r}")
-        op = item.get("op", "=")
+        op = item.get("op", "=").upper()
         if op not in _VALID_OPS:
             raise ValueError(f"Invalid filter op '{op}'. Must be one of: {sorted(_VALID_OPS)}")
         value = item.get("value", "")
+        if op == "IN":
+            if not isinstance(value, list) or len(value) == 0:
+                raise ValueError(f"IN operator requires a non-empty list for 'value'. Got: {value!r}")
+        elif op == "LIKE":
+            if not isinstance(value, str):
+                raise ValueError(f"LIKE operator requires a string 'value'. Got: {value!r}")
         conditions.append(FilterCondition(column=column, op=op, value=value))
     return conditions
 
@@ -66,6 +72,9 @@ async def select_rows(
     filters: list[dict] | None = None,
     fields: list[str] | None = None,
     limit: int = Config.get("shared.default_query_limit"),
+    order_by: str | None = None,
+    order: str = "asc",
+    distinct: bool = False,
     ctx: Context = None,
 ) -> str:
     """Retrieve rows from the data table.
@@ -73,16 +82,27 @@ async def select_rows(
     - fields: list of column names to return (default: all columns).
     - filters: list of filter objects. Each has:
         - "column": column name
-        - "op": one of "=", ">", ">=", "<", "<=" (default "=")
-        - "value": the value to compare against
+        - "op": one of "=", ">", ">=", "<", "<=", "LIKE", "IN" (default "=")
+        - "value": the value to compare against. For IN, pass a list of values.
       Example: [{"column": "age", "op": ">", "value": 30}, {"column": "city", "value": "London"}]
+      LIKE example: [{"column": "name", "op": "LIKE", "value": "%son%"}]
+      IN example: [{"column": "city", "op": "IN", "value": ["London", "Paris"]}]
     - limit: max rows to return (default 20, max 100).
+    - order_by: column name to sort results by.
+    - order: "asc" or "desc" (default "asc").
+    - distinct: if true, return only unique combinations of the selected fields.
     """
     logger.info("Executing row selection tool")
     repository = _get_repository(ctx)
+    order = order.lower()
+    if order not in ("asc", "desc"):
+        return json.dumps({"error": "order must be 'asc' or 'desc'"})
     try:
         parsed_filters = _parse_filters(filters)
-        query_result = await repository.select_rows(filters=parsed_filters, fields=fields, limit=limit)
+        query_result = await repository.select_rows(
+            filters=parsed_filters, fields=fields, limit=limit,
+            order_by=order_by, order=order, distinct=distinct,
+        )
     except ValueError as e:
         logger.warning("select_rows validation failed")
         return json.dumps({"error": str(e)})
@@ -95,6 +115,8 @@ async def aggregate(
     group_by: str | None = None,
     filters: list[dict] | None = None,
     limit: int = Config.get("shared.default_query_limit"),
+    order_by: str | None = None,
+    order: str = "desc",
     ctx: Context = None,
 ) -> str:
     """Run an aggregation on the data table.
@@ -105,13 +127,19 @@ async def aggregate(
     - filters: list of filter objects, same format as select_rows.
       Example: [{"column": "age", "op": ">=", "value": 18}]
     - limit: max groups to return when using group_by (default 20, max 100).
+    - order_by: column to sort grouped results by — the group column name or "result" (default "result"). Only applies when group_by is used.
+    - order: "asc" or "desc" (default "desc").
     """
     logger.info("Executing aggregation tool")
     repository = _get_repository(ctx)
+    order = order.lower()
+    if order not in ("asc", "desc"):
+        return json.dumps({"error": "order must be 'asc' or 'desc'"})
     try:
         parsed_filters = _parse_filters(filters)
         query_result = await repository.aggregate(
             operation=op, field=field, group_by=group_by, filters=parsed_filters, limit=limit,
+            order_by=order_by, order=order,
         )
     except ValueError as e:
         logger.warning("aggregate validation failed")

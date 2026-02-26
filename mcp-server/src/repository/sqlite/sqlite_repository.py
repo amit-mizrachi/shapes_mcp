@@ -15,7 +15,7 @@ from shared.modules.table_schema import TableSchema
 
 logger = logging.getLogger(__name__)
 
-VALID_SQL_OPS = {"=", ">", ">=", "<", "<="}
+VALID_SQL_OPS = {"=", ">", ">=", "<", "<=", "LIKE", "IN"}
 
 
 class SqliteRepository:
@@ -36,11 +36,15 @@ class SqliteRepository:
         filters: Optional[list[FilterCondition]] = None,
         fields: Optional[list[str]] = None,
         limit: int = Config.get("shared.default_query_limit"),
+        order_by: Optional[str] = None,
+        order: str = "asc",
+        distinct: bool = False,
     ) -> QueryResult:
         select_columns = self._build_select_columns(fields)
         where_clause, params = self._build_where_clause(filters)
-
-        sql_query = f'SELECT {select_columns} FROM "{self._table_name}"{where_clause} LIMIT ?'
+        order_clause = self._build_order_clause(order_by, order)
+        distinct_keyword = "DISTINCT " if distinct else ""
+        sql_query = f'SELECT {distinct_keyword}{select_columns} FROM "{self._table_name}"{where_clause}{order_clause} LIMIT ?'
         params.append(limit)
 
         return await self._run_query(sql_query, params)
@@ -52,12 +56,15 @@ class SqliteRepository:
         group_by: Optional[str] = None,
         filters: Optional[list[FilterCondition]] = None,
         limit: int = Config.get("shared.default_query_limit"),
+        order_by: Optional[str] = None,
+        order: str = "desc",
     ) -> QueryResult:
         operation = self._validate_aggregation_args(operation, field, group_by)
         where_clause, params = self._build_where_clause(filters)
         aggregation_expression = self._build_aggregation_expression(operation, field)
-
-        sql_query, params = self._build_aggregated_sql_query(aggregation_expression, where_clause, params, group_by, limit)
+        sql_query, params = self._build_aggregated_sql_query(
+            aggregation_expression, where_clause, params, group_by, limit, order_by, order,
+        )
 
         return await self._run_query(sql_query, params)
 
@@ -75,11 +82,14 @@ class SqliteRepository:
         if not filters:
             return "", []
         parts: list[str] = []
-        params: list[str | int | float] = []
+        params: list = []
         for filter in filters:
             self._validate_filter(filter)
             parts.append(self._filter_to_sql_expression(filter))
-            params.append(filter.value)
+            if filter.op == "IN":
+                params.extend(filter.value)
+            else:
+                params.append(filter.value)
         where_clause = " WHERE " + " AND ".join(parts)
         return where_clause, params
 
@@ -89,16 +99,25 @@ class SqliteRepository:
             raise ValueError(f"Unknown filter operator '{f.op}'")
 
     def _filter_to_sql_expression(self, f: FilterCondition) -> str:
+        if f.op == "LIKE":
+            return f'"{f.column}" LIKE ?'
+        if f.op == "IN":
+            placeholders = ",".join("?" * len(f.value))
+            return f'"{f.column}" IN ({placeholders})'
         if self._column_types.get(f.column) == "numeric" and f.op != "=":
             return f'CAST("{f.column}" AS REAL) {f.op} ?'
         return f'"{f.column}" {f.op} ?'
 
+    def _build_order_clause(self, order_by: Optional[str], order: str) -> str:
+        if order_by is None:
+            return ""
+        self._validate_column(order_by)
+        return f' ORDER BY "{order_by}" {order.upper()}'
+
     def _validate_aggregation_args(self, operation: str, field: Optional[str], group_by: Optional[str]) -> str:
         sql_operation = operation.upper()
         if sql_operation not in ("COUNT", "SUM", "AVG", "MIN", "MAX"):
-            raise ValueError(
-                f"Unsupported aggregation op: {operation}. Use count, sum, avg, min, or max."
-            )
+            raise ValueError(f"Unsupported aggregation op: {operation}. Use count, sum, avg, min, or max.")
         if sql_operation != "COUNT":
             if not field:
                 raise ValueError(f"'field' is required for {operation}.")
@@ -112,19 +131,19 @@ class SqliteRepository:
             return "COUNT(*)"
         return f'{sql_operation}(CAST("{field}" AS REAL))'
 
-    def _build_aggregated_sql_query(
-        self, aggregation_expression: str, where_clause: str, params: list, group_by: Optional[str], limit: int,
-    ) -> tuple[str, list]:
-        if group_by:
-            sql = (
-                f'SELECT "{group_by}", {aggregation_expression} AS result '
-                f'FROM "{self._table_name}"{where_clause} '
-                f'GROUP BY "{group_by}" ORDER BY result DESC LIMIT ?'
-            )
-            params.append(limit)
-        else:
-            sql = f'SELECT {aggregation_expression} AS result FROM "{self._table_name}"{where_clause}'
-        return sql, params
+    def _build_aggregated_sql_query(self, aggregation_expression, where_clause, params, group_by, limit, order_by, order):
+        if not group_by:
+            sql_query = f'SELECT {aggregation_expression} AS result FROM "{self._table_name}"{where_clause}'
+            return sql_query, params
+
+        order_clause = self._build_order_clause(order_by, order)
+        sql_query = (
+            f'SELECT "{group_by}", {aggregation_expression} AS result '
+            f'FROM "{self._table_name}"{where_clause} '
+            f'GROUP BY "{group_by}"{order_clause} LIMIT ?'
+        )
+        params.append(limit)
+        return sql_query, params
 
     def _validate_column(self, column: str) -> None:
         if column not in self._valid_columns:

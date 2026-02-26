@@ -7,4 +7,4 @@ from dataclasses import dataclass
 class FilterCondition:
     column: str
     op: str = "="
-    value: str | int | float = ""
+    value: str | int | float | list = ""
