@@ -5,7 +5,7 @@ import os
 import re
 from dataclasses import dataclass
 
-from config import Config
+from shared.config import Config
 from shared.modules.column_info import ColumnInfo
 
 class CSVParser:

@@ -9,7 +9,7 @@ from mcp.server.fastmcp import FastMCP
 from starlette.responses import JSONResponse
 
 import tools
-from config import Config
+from shared.config import Config
 from repository.sqlite.sqlite_ingester import SqliteIngester
 from repository.sqlite.sqlite_repository import SqliteRepository
 

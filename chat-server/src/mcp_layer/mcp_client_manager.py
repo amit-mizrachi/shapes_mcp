@@ -5,7 +5,7 @@ import logging
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 
-from config import Config
+from shared.config import Config
 from .mcp_client import MCPClient
 
 logger = logging.getLogger(__name__)

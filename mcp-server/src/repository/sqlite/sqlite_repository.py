@@ -1,22 +1,20 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 import aiosqlite
 
-from config import Config
+from shared.config import Config
 from shared.modules.column_info import ColumnInfo
+from shared.modules.filter_condition import FilterCondition
 from shared.modules.query_result import QueryResult
 from shared.modules.table_schema import TableSchema
 
 logger = logging.getLogger(__name__)
 
-FILTER_SUFFIX_TO_SQL_OPERATOR = {
-    "_gt": ">",
-    "_gte": ">=",
-    "_lt": "<",
-    "_lte": "<=",
-}
+VALID_SQL_OPS = {"=", ">", ">=", "<", "<="}
 
 
 class SqliteRepository:
@@ -27,38 +25,47 @@ class SqliteRepository:
         self._valid_columns = {c.name for c in columns}
         self._column_types = {c.name: c.detected_type for c in columns}
 
-    async def _open_read_only_connection(self) -> aiosqlite.Connection:
+    @asynccontextmanager
+    async def _connection(self) -> AsyncIterator[aiosqlite.Connection]:
         # Shared-cache in-memory connections must be read-write; query_only pragma provides read-only safety
-        connection = await aiosqlite.connect(self._db_uri, uri=True)
-        await connection.execute("PRAGMA query_only = ON")
-        connection.row_factory = aiosqlite.Row
-        return connection
+        conn = await aiosqlite.connect(self._db_uri, uri=True)
+        await conn.execute("PRAGMA query_only = ON")
+        conn.row_factory = aiosqlite.Row
+        try:
+            yield conn
+        finally:
+            await conn.close()
+
+    async def _execute_query(self, conn: aiosqlite.Connection, sql: str, params: list) -> QueryResult:
+        cursor = await conn.execute(sql, params)
+        rows = await cursor.fetchall()
+        columns = [d[0] for d in cursor.description]
+        row_dicts = [dict(zip(columns, row)) for row in rows]
+        return QueryResult(columns=columns, rows=row_dicts, count=len(row_dicts))
+
+    def _validate_column(self, column: str) -> None:
+        if column not in self._valid_columns:
+            raise ValueError(f"Column '{column}' not found. Valid columns: {sorted(self._valid_columns)}")
 
     def _build_where_clause(
         self,
-        filters: dict[str, str | int | float] | None,
+        filters: list[FilterCondition] | None,
     ) -> tuple[str, list]:
-        """Build a WHERE clause. Raises ValueError on invalid column names."""
+        """Build a WHERE clause from pre-parsed FilterCondition objects."""
         if not filters:
             return "", []
         parts: list[str] = []
         params: list[str | int | float] = []
-        for key, value in filters.items():
-            column, operation = key, "="
-            for suffix, sql_operation in FILTER_SUFFIX_TO_SQL_OPERATOR.items():
-                if key.endswith(suffix):
-                    column, operation = key[: -len(suffix)], sql_operation
-                    break
-            if column not in self._valid_columns:
-                raise ValueError(
-                    f"Column '{column}' not found. Valid columns: {sorted(self._valid_columns)}"
-                )
-            if self._column_types.get(column) == "numeric" and operation != "=":
-                parts.append(f'CAST("{column}" AS REAL) {operation} ?')
+        for f in filters:
+            self._validate_column(f.column)
+            if f.op not in VALID_SQL_OPS:
+                raise ValueError(f"Unknown filter operator '{f.op}'")
+            if self._column_types.get(f.column) == "numeric" and f.op != "=":
+                parts.append(f'CAST("{f.column}" AS REAL) {f.op} ?')
             else:
-                parts.append(f'"{column}" {operation} ?')
-            params.append(value)
-        where_clause = (" WHERE " + " AND ".join(parts)) if parts else ""
+                parts.append(f'"{f.column}" {f.op} ?')
+            params.append(f.value)
+        where_clause = " WHERE " + " AND ".join(parts)
         return where_clause, params
 
     async def get_schema(self) -> TableSchema | None:
@@ -68,16 +75,13 @@ class SqliteRepository:
 
     async def select_rows(
         self,
-        filters: dict[str, str | int | float] | None = None,
+        filters: list[FilterCondition] | None = None,
         fields: list[str] | None = None,
         limit: int = Config.get("shared.default_query_limit"),
     ) -> QueryResult:
         if fields:
             for field_name in fields:
-                if field_name not in self._valid_columns:
-                    raise ValueError(
-                        f"Column '{field_name}' not found. Valid columns: {sorted(self._valid_columns)}"
-                    )
+                self._validate_column(field_name)
             select_cols = ", ".join(f'"{field_name}"' for field_name in fields)
         else:
             select_cols = "*"
@@ -86,43 +90,34 @@ class SqliteRepository:
         sql = f'SELECT {select_cols} FROM "{self._table_name}"{where_clause} LIMIT ?'
         params.append(limit)
 
-        conn = await self._open_read_only_connection()
-        try:
-            cursor = await conn.execute(sql, params)
-            rows = await cursor.fetchall()
-            columns = [d[0] for d in cursor.description]
-            row_dicts = [dict(zip(columns, row)) for row in rows]
-            return QueryResult(columns=columns, rows=row_dicts, count=len(row_dicts))
-        except Exception:
-            logger.error("select_rows query failed", exc_info=True)
-            raise
-        finally:
-            await conn.close()
+        async with self._connection() as conn:
+            try:
+                return await self._execute_query(conn, sql, params)
+            except Exception:
+                logger.error("select_rows query failed", exc_info=True)
+                raise
 
     async def aggregate(
         self,
-        op: str,
+        operation: str,
         field: str | None = None,
         group_by: str | None = None,
-        filters: dict[str, str | int | float] | None = None,
+        filters: list[FilterCondition] | None = None,
         limit: int = Config.get("shared.default_query_limit"),
     ) -> QueryResult:
-        sql_operation = op.upper()
+        sql_operation = operation.upper()
         if sql_operation not in ("COUNT", "SUM", "AVG", "MIN", "MAX"):
             raise ValueError(
-                f"Unsupported aggregation op: {op}. Use count, sum, avg, min, or max."
+                f"Unsupported aggregation op: {operation}. Use count, sum, avg, min, or max."
             )
 
-        if sql_operation != "COUNT" and (not field or field not in self._valid_columns):
-            raise ValueError(
-                f"'field' is required for {op} and must be a valid column. "
-                f"Valid columns: {sorted(self._valid_columns)}"
-            )
+        if sql_operation != "COUNT":
+            if not field:
+                raise ValueError(f"'field' is required for {operation}.")
+            self._validate_column(field)
 
-        if group_by and group_by not in self._valid_columns:
-            raise ValueError(
-                f"Column '{group_by}' not found. Valid columns: {sorted(self._valid_columns)}"
-            )
+        if group_by:
+            self._validate_column(group_by)
 
         where_clause, params = self._build_where_clause(filters)
 
@@ -141,15 +136,9 @@ class SqliteRepository:
         else:
             sql = f'SELECT {aggregation_expression} AS result FROM "{self._table_name}"{where_clause}'
 
-        conn = await self._open_read_only_connection()
-        try:
-            cursor = await conn.execute(sql, params)
-            rows = await cursor.fetchall()
-            columns = [d[0] for d in cursor.description]
-            row_dicts = [dict(zip(columns, row)) for row in rows]
-            return QueryResult(columns=columns, rows=row_dicts, count=len(row_dicts))
-        except Exception:
-            logger.error("aggregate query failed", exc_info=True)
-            raise
-        finally:
-            await conn.close()
+        async with self._connection() as conn:
+            try:
+                return await self._execute_query(conn, sql, params)
+            except Exception:
+                logger.error("aggregate query failed", exc_info=True)
+                raise

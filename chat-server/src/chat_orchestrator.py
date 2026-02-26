@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 
-from config import Config
+from shared.config import Config
 from shared.modules.chat_result import ChatResult
 from llm.llm_client import LLMClient
 from mcp_layer.mcp_client import MCPClient

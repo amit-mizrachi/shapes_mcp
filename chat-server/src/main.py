@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from config import Config
+from shared.config import Config
 from chat_orchestrator import ChatOrchestrator
 from shared.modules.chat_request import ChatRequest
 from shared.modules.chat_response import ChatResponse

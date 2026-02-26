@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
+from shared.modules.filter_condition import FilterCondition
 from shared.modules.table_schema import TableSchema
 from shared.modules.query_result import QueryResult
 
@@ -12,16 +13,16 @@ class DataRepository(Protocol):
 
     async def select_rows(
         self,
-        filters: dict[str, str | int | float] | None = None,
+        filters: list[FilterCondition] | None = None,
         fields: list[str] | None = None,
         limit: int = 20,
     ) -> QueryResult: ...
 
     async def aggregate(
         self,
-        op: str,
+        operation: str,
         field: str | None = None,
         group_by: str | None = None,
-        filters: dict[str, str | int | float] | None = None,
+        filters: list[FilterCondition] | None = None,
         limit: int = 20,
     ) -> QueryResult: ...
