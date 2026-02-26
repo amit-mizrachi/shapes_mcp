@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 
@@ -17,9 +18,16 @@ from llm_clients.claude_llm_client import ClaudeLLMClient
 from llm_clients.gemini_llm_client import GeminiLLMClient
 from mcp_client.mcp_client_manager import MCPClientManager
 
+_MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "http://mcp-server:3001/mcp")
+_MCP_MAX_CONCURRENT = 10
+_SEMAPHORE_TIMEOUT = 30.0
+_RETRY_ATTEMPTS = 10
+_RETRY_SLEEP = 3
+_TIMEOUT_SECONDS = 120
+
 logging.basicConfig(
-    level=Config.get("shared.log_level"),
-    format=Config.get("shared.log_format"),
+    level="INFO",
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
 
@@ -27,24 +35,22 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     mcp_manager = MCPClientManager(
-        url=Config.get("chat_server.mcp_server_url"),
-        max_concurrent=Config.get("chat_server.mcp_max_concurrent"),
-        semaphore_timeout=Config.get("chat_server.semaphore_timeout"),
+        url=_MCP_SERVER_URL,
+        max_concurrent=_MCP_MAX_CONCURRENT,
+        semaphore_timeout=_SEMAPHORE_TIMEOUT,
     )
 
-    retry_attempts = Config.get("chat_server.retry_attempts")
-    retry_sleep = Config.get("chat_server.retry_sleep")
-    for attempt in range(1, retry_attempts + 1):
+    for attempt in range(1, _RETRY_ATTEMPTS + 1):
         try:
             await mcp_manager.initialize()
             logger.info("MCP connection established (attempt %d)", attempt)
             break
         except Exception:
-            if attempt == retry_attempts:
-                logger.error("Failed to connect to MCP server after %d attempts", retry_attempts)
+            if attempt == _RETRY_ATTEMPTS:
+                logger.error("Failed to connect to MCP server after %d attempts", _RETRY_ATTEMPTS)
                 raise
-            logger.warning("MCP connection attempt %d/%d failed, retrying in %ds...", attempt, retry_attempts, retry_sleep)
-            await asyncio.sleep(retry_sleep)
+            logger.warning("MCP connection attempt %d/%d failed, retrying in %ds...", attempt, _RETRY_ATTEMPTS, _RETRY_SLEEP)
+            await asyncio.sleep(_RETRY_SLEEP)
 
     provider = Config.get("chat_server.llm_provider")
     if provider == "gemini":
@@ -64,7 +70,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         system_prompt=Config.get("chat_server.system_prompt"),
         max_iterations=Config.get("chat_server.max_iterations"),
     )
-    app.state.timeout = Config.get("chat_server.timeout_seconds")
+    app.state.timeout = _TIMEOUT_SECONDS
 
     yield
 
@@ -73,9 +79,9 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=Config.get("chat_server.cors_origins"),
-    allow_methods=Config.get("chat_server.cors_methods"),
-    allow_headers=Config.get("chat_server.cors_headers"),
+    allow_origins=["http://localhost:3000"],
+    allow_methods=["POST", "GET"],
+    allow_headers=["Content-Type"],
 )
 
 
