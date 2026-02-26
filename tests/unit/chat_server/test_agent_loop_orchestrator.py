@@ -1,4 +1,4 @@
-"""Tests for chat-server/src/chat_use_case.py — agent loop, max iterations, tracing."""
+"""Tests for chat-server/src/agent_loop_orchestrator.py — agent loop, max iterations, tracing."""
 
 from unittest.mock import AsyncMock
 
@@ -8,7 +8,7 @@ from shared.modules.api.chat_request import ChatRequest
 from shared.modules.api.message_item import MessageItem
 from shared.modules.llm.llm_response import LLMResponse
 from shared.modules.llm.tool_call import ToolCall
-from chat_use_case import ChatUseCase
+from agent_loop_orchestrator import AgentLoopOrchestrator
 
 
 def _request(content: str = "hello") -> ChatRequest:
@@ -26,8 +26,8 @@ def _tool_response(tool_name: str = "get_schema", tool_args: dict = None, text: 
     )
 
 
-def _make_use_case(llm_client, mcp_manager, max_iterations: int = 10) -> ChatUseCase:
-    return ChatUseCase(
+def _make_orchestrator(llm_client, mcp_manager, max_iterations: int = 10) -> AgentLoopOrchestrator:
+    return AgentLoopOrchestrator(
         llm_client=llm_client,
         mcp_manager=mcp_manager,
         system_prompt="You are helpful",
@@ -37,16 +37,16 @@ def _make_use_case(llm_client, mcp_manager, max_iterations: int = 10) -> ChatUse
 
 class TestExecute:
     async def test_simple_text_response(self, mock_llm_client, mock_mcp_manager):
-        uc = _make_use_case(mock_llm_client, mock_mcp_manager)
-        result = await uc.execute(_request())
+        orch =_make_orchestrator(mock_llm_client, mock_mcp_manager)
+        result = await orch.execute(_request())
         assert result.answer == "Hello!"
         assert result.tool_calls == []
 
     async def test_exception_propagates(self, mock_llm_client, mock_mcp_manager):
         mock_llm_client.invoke = AsyncMock(side_effect=RuntimeError("LLM crashed"))
-        uc = _make_use_case(mock_llm_client, mock_mcp_manager)
+        orch =_make_orchestrator(mock_llm_client, mock_mcp_manager)
         with pytest.raises(RuntimeError, match="LLM crashed"):
-            await uc.execute(_request())
+            await orch.execute(_request())
 
 
 class TestAgentLoop:
@@ -57,8 +57,8 @@ class TestAgentLoop:
             _text_response("The schema has 2 columns."),
         ])
 
-        uc = _make_use_case(mock_llm_client, mock_mcp_manager)
-        result = await uc.execute(_request("show schema"))
+        orch =_make_orchestrator(mock_llm_client, mock_mcp_manager)
+        result = await orch.execute(_request("show schema"))
 
         assert result.answer == "The schema has 2 columns."
         assert len(result.tool_calls) == 1
@@ -73,8 +73,8 @@ class TestAgentLoop:
             _text_response("Found 5 rows."),
         ])
 
-        uc = _make_use_case(mock_llm_client, mock_mcp_manager)
-        result = await uc.execute(_request("analyze data"))
+        orch =_make_orchestrator(mock_llm_client, mock_mcp_manager)
+        result = await orch.execute(_request("analyze data"))
 
         assert result.answer == "Found 5 rows."
         assert len(result.tool_calls) == 2
@@ -83,8 +83,8 @@ class TestAgentLoop:
         """If LLM keeps calling tools beyond max_iterations, return fallback."""
         mock_llm_client.invoke = AsyncMock(return_value=_tool_response("get_schema"))
 
-        uc = _make_use_case(mock_llm_client, mock_mcp_manager, max_iterations=3)
-        result = await uc.execute(_request("loop"))
+        orch =_make_orchestrator(mock_llm_client, mock_mcp_manager, max_iterations=3)
+        result = await orch.execute(_request("loop"))
 
         assert "maximum number of steps" in result.answer.lower()
         assert len(result.tool_calls) == 3
@@ -97,16 +97,16 @@ class TestAgentLoop:
         ])
         mock_mcp_client.call_tool = AsyncMock(side_effect=Exception("Tool failed"))
 
-        uc = _make_use_case(mock_llm_client, mock_mcp_manager)
-        result = await uc.execute(_request("query"))
+        orch =_make_orchestrator(mock_llm_client, mock_mcp_manager)
+        result = await orch.execute(_request("query"))
 
         assert result.answer == "Sorry, something went wrong."
 
     async def test_no_text_in_response(self, mock_llm_client, mock_mcp_manager):
         """If LLM returns None text with no tool calls, return empty answer."""
         mock_llm_client.invoke = AsyncMock(return_value=LLMResponse(text=None, tool_calls=[]))
-        uc = _make_use_case(mock_llm_client, mock_mcp_manager)
-        result = await uc.execute(_request())
+        orch =_make_orchestrator(mock_llm_client, mock_mcp_manager)
+        result = await orch.execute(_request())
         assert result.answer == ""
 
     async def test_trace_records_tool_calls(self, mock_llm_client, mock_mcp_manager, mock_mcp_client):
@@ -116,15 +116,15 @@ class TestAgentLoop:
             _text_response("Done"),
         ])
 
-        uc = _make_use_case(mock_llm_client, mock_mcp_manager)
-        result = await uc.execute(_request("schema"))
+        orch =_make_orchestrator(mock_llm_client, mock_mcp_manager)
+        result = await orch.execute(_request("schema"))
 
         assert result.tool_calls[0]["tool"] == "get_schema"
         assert result.tool_calls[0]["arguments"] == {}
 
     async def test_system_prompt_prepended(self, mock_llm_client, mock_mcp_manager):
-        uc = _make_use_case(mock_llm_client, mock_mcp_manager)
-        await uc.execute(_request())
+        orch =_make_orchestrator(mock_llm_client, mock_mcp_manager)
+        await orch.execute(_request())
 
         call_args = mock_llm_client.invoke.call_args
         messages = call_args[0][0]
@@ -138,6 +138,6 @@ class TestAgentLoop:
             _text_response("Schema has 3 columns"),
         ])
 
-        uc = _make_use_case(mock_llm_client, mock_mcp_manager)
-        result = await uc.execute(_request("schema"))
+        orch =_make_orchestrator(mock_llm_client, mock_mcp_manager)
+        result = await orch.execute(_request("schema"))
         assert result.answer == "Schema has 3 columns"

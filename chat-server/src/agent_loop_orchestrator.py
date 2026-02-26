@@ -10,7 +10,7 @@ from shared.modules.api.chat_response import ChatResponse
 logger = logging.getLogger(__name__)
 
 
-class ChatUseCase:
+class AgentLoopOrchestrator:
     def __init__(
         self,
         llm_client: BaseLLMClient,

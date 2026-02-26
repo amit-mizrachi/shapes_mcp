@@ -14,7 +14,7 @@ def app_with_mocks():
     """Import and configure the FastAPI app with mocked dependencies."""
     with patch("server.MCPClientManager") as mock_mgr_cls, \
          patch("server.ClaudeLLMClient") as mock_llm_cls, \
-         patch("server.ChatUseCase") as mock_uc_cls:
+         patch("server.AgentLoopOrchestrator") as mock_uc_cls:
 
         mock_mgr = MagicMock()
         mock_mgr.initialize = AsyncMock()
@@ -30,7 +30,7 @@ def app_with_mocks():
         import server
 
         # Manually wire app.state since ASGITransport doesn't trigger lifespan
-        server.app.state.chat_use_case = mock_uc
+        server.app.state.orchestrator = mock_uc
         server.app.state.timeout = 120
 
         yield server.app, mock_uc

@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from shared.config import Config
 from shared.modules.api.chat_request import ChatRequest
 from shared.modules.api.chat_response import ChatResponse
-from chat_use_case import ChatUseCase
+from agent_loop_orchestrator import AgentLoopOrchestrator
 from llm_client.claude.claude_llm_client import ClaudeLLMClient
 from mcp_client.mcp_client_manager import MCPClientManager
 
@@ -25,7 +25,6 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    # Wire dependencies
     mcp_manager = MCPClientManager(
         url=Config.get("chat_server.mcp_server_url"),
         max_concurrent=Config.get("chat_server.mcp_max_concurrent"),
@@ -51,7 +50,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         max_tokens=Config.get("chat_server.max_tokens"),
     )
 
-    app.state.chat_use_case = ChatUseCase(
+    app.state.orchestrator = AgentLoopOrchestrator(
         llm_client=llm_client,
         mcp_manager=mcp_manager,
         system_prompt=Config.get("chat_server.system_prompt"),
@@ -81,7 +80,7 @@ async def health():
 async def chat(request: ChatRequest, raw_request: Request):
     try:
         response = await asyncio.wait_for(
-            raw_request.app.state.chat_use_case.execute(request),
+            raw_request.app.state.orchestrator.execute(request),
             timeout=raw_request.app.state.timeout,
         )
         return response
