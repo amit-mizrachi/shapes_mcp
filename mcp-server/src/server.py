@@ -29,8 +29,8 @@ async def server_lifespan(server: FastMCP):
         logger.info("Initializing database ingestor")
         ingester = SqliteIngester(db_path_str)
 
-        csv_file_path = Config.get("mcp_server.csv_file_path")
         logger.info("Ingesting CSV data to database")
+        csv_file_path = Config.get("mcp_server.csv_file_path")
         ingest_result = ingester.ingest(csv_file_path)
 
         logger.info("Initializing SQL Repository")

@@ -12,7 +12,13 @@ class Config:
         "mcp_server.numeric_threshold":    0.8,
 
         # ── Chat Server ──
-        "chat_server.llm_provider":      "gemini",
+        "chat_server.mcp_server_url":                "http://mcp-server:3001/mcp",
+        "chat_server.mcp_max_concurrent":            10,
+        "chat_server.semaphore_timeout":             30.0,
+        "chat_server.mcp_connection.retry_attempts": 3,
+        "chat_server.mcp_connection.retry_sleep":    3,
+        "chat_server.timeout_seconds":               120,
+        "chat_server.llm_provider":                  "gemini",
         "chat_server.anthropic_model":   "claude-sonnet-4-20250514",
         "chat_server.max_tokens":        4096,
         "chat_server.gemini_model":      "gemini-2.5-flash",
