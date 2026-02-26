@@ -7,6 +7,7 @@ services:
       - "3001"
     volumes:
       - ./data:/app/data:ro
+      - mcp-db:/app/db
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3001/health')"]
@@ -51,3 +52,6 @@ services:
       chat-backend:
         condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  mcp-db:

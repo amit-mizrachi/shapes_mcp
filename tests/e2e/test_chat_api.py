@@ -1,15 +1,12 @@
 """E2E: FastAPI + real MCP pipeline + mocked LLM."""
 
 import json
-import sqlite3
-import uuid
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from shared.modules.api.chat_response import ChatResponse
 from shared.modules.llm.llm_response import LLMResponse
 from shared.modules.llm.tool_call import ToolCall
 from repository.sqlite.sqlite_ingester import SqliteIngester
@@ -17,19 +14,15 @@ from repository.sqlite.sqlite_repository import SqliteRepository
 
 
 @pytest.fixture()
-def real_mcp_pipeline(sample_csv_path):
+def real_mcp_pipeline(sample_csv_path, tmp_path):
     """Set up a real SQLite-backed MCP pipeline."""
-    db_name = f"e2e_chat_{uuid.uuid4().hex[:8]}"
-    db_uri = f"file:{db_name}?mode=memory&cache=shared"
-    keeper = sqlite3.connect(db_uri, uri=True)
+    db_path = str(tmp_path / "e2e_chat.db")
 
-    ingester = SqliteIngester(db_uri)
+    ingester = SqliteIngester(db_path)
     result = ingester.ingest(str(sample_csv_path))
-    repo = SqliteRepository(db_uri, result.table_name, result.columns)
+    repo = SqliteRepository(db_path, result.table_name, result.columns)
 
     yield repo, result
-
-    keeper.close()
 
 
 @pytest.fixture()
@@ -48,10 +41,9 @@ def mock_llm_for_e2e():
 
 @pytest.fixture()
 async def e2e_client(real_mcp_pipeline, mock_llm_for_e2e):
-    """FastAPI app with real MCP tools + mocked LLM."""
-    repo, result = real_mcp_pipeline
+    """FastAPI app with real MCP tools + mocked LLM, bypassing the lifespan."""
+    repo, _ = real_mcp_pipeline
 
-    # Build a mock MCP manager that yields a real-ish tool calling interface
     mock_mcp_client = AsyncMock()
     mock_mcp_client.call_tool = AsyncMock(side_effect=_make_tool_caller(repo))
 
@@ -68,23 +60,30 @@ async def e2e_client(real_mcp_pipeline, mock_llm_for_e2e):
 
     mock_manager.client = _client
 
-    with patch("server.MCPClientManager") as mock_mgr_cls, \
-         patch("server.ClaudeLLMClient") as mock_llm_cls, \
-         patch("server.ChatOrchestrator") as mock_orch_cls:
+    from chat_orchestrator import ChatOrchestrator
+    from shared.config import Config
 
-        mock_mgr_cls.return_value = MagicMock(initialize=AsyncMock())
-        mock_llm_cls.return_value = mock_llm_for_e2e
+    orchestrator = ChatOrchestrator(
+        llm_client=mock_llm_for_e2e,
+        mcp_manager=mock_manager,
+        system_prompt=Config.get("chat_server.system_prompt"),
+        max_iterations=Config.get("chat_server.max_iterations"),
+    )
 
-        from chat_orchestrator import ChatOrchestrator
-        real_orch = ChatOrchestrator(mock_llm_for_e2e, mock_manager)
+    import server
+    server.app.state.orchestrator = orchestrator
+    server.app.state.timeout = 120
 
-        import server
-        server.mcp_manager = mock_manager
-        server.orchestrator = real_orch
-
+    # Bypass the real lifespan which connects to MCP server
+    with patch("server.lifespan", _noop_lifespan):
         transport = ASGITransport(app=server.app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             yield ac
+
+
+@asynccontextmanager
+async def _noop_lifespan(app):
+    yield
 
 
 def _make_tool_caller(repo):

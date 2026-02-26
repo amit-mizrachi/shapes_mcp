@@ -10,7 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY shared/ ./shared/
 COPY mcp-server/src/ ./mcp-server/src/
 
-RUN chown -R appuser:appuser /app
+RUN mkdir -p /app/db && chown -R appuser:appuser /app
 
 USER appuser
 

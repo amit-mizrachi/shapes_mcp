@@ -4,7 +4,12 @@ class Config:
         "shared.default_query_limit": 20,
 
         # ── MCP Server ──
-        "mcp_server.numeric_threshold": 0.8,
+        "mcp_server.db_path":              "/app/db/shapes.db",
+        "mcp_server.csv_file_path":        "/app/data/people-list-export.csv",
+        "mcp_server.host":                 "0.0.0.0",
+        "mcp_server.port":                 3001,
+        "mcp_server.streamable_http_path": "/mcp",
+        "mcp_server.numeric_threshold":    0.8,
 
         # ── Chat Server ──
         "chat_server.llm_provider":      "gemini",

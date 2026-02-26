@@ -14,7 +14,7 @@ class SqliteIngester:
     def ingest(self, csv_path: str) -> TableSchema:
         parsed_csv = CSVParser.parse(csv_path)
 
-        connection = sqlite3.connect(self._db_uri, uri=True)
+        connection = sqlite3.connect(self._db_uri)
         try:
             self._create_table(connection, parsed_csv)
             self._insert_rows(connection, parsed_csv)

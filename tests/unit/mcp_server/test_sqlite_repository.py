@@ -12,12 +12,11 @@ from repository.sqlite.sqlite_ingester import SqliteIngester
 
 
 @pytest.fixture()
-def repo_with_data(in_memory_db, sample_csv_path):
+def repo_with_data(test_db, sample_csv_path):
     """Ingest sample data and return a SqliteRepository."""
-    db_uri, keeper = in_memory_db
-    ingester = SqliteIngester(db_uri)
+    ingester = SqliteIngester(test_db)
     result = ingester.ingest(str(sample_csv_path))
-    repo = SqliteRepository(db_uri, result.table_name, result.columns)
+    repo = SqliteRepository(test_db, result.table_name, result.columns)
     return repo
 
 
@@ -28,9 +27,8 @@ class TestGetSchema:
         assert schema.table_name == "sample_data"
         assert len(schema.columns) == 5
 
-    async def test_returns_none_when_no_columns(self, in_memory_db):
-        db_uri, keeper = in_memory_db
-        repo = SqliteRepository(db_uri, "empty", [])
+    async def test_returns_none_when_no_columns(self, test_db):
+        repo = SqliteRepository(test_db, "empty", [])
         schema = await repo.get_schema()
         assert schema is None
 

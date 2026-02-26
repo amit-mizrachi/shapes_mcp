@@ -36,10 +36,11 @@ class SqliteRepository:
         order: str = "asc",
         distinct: bool = False,
     ) -> QueryResult:
+        distinct_keyword = "DISTINCT " if distinct else ""
         select_columns = self._build_select_columns(fields)
         where_clause, params = self._build_where_clause(filters)
         order_clause = self._build_order_clause(order_by, order)
-        distinct_keyword = "DISTINCT " if distinct else ""
+
         sql_query = f'SELECT {distinct_keyword}{select_columns} FROM "{self._table_name}"{where_clause}{order_clause} LIMIT ?'
         params.append(limit)
 
@@ -147,8 +148,7 @@ class SqliteRepository:
 
     @asynccontextmanager
     async def _connection(self) -> AsyncIterator[aiosqlite.Connection]:
-        # Shared-cache in-memory connections must be read-write; query_only pragma provides read-only safety
-        connection = await aiosqlite.connect(self._db_uri, uri=True)
+        connection = await aiosqlite.connect(self._db_uri)
         await connection.execute("PRAGMA query_only = ON")
         connection.row_factory = aiosqlite.Row
         try:

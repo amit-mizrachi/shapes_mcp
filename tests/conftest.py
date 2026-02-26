@@ -1,11 +1,9 @@
-"""Root conftest: sys.path setup, shared fixtures, DB keeper pattern."""
+"""Root conftest: sys.path setup and shared fixtures."""
 
 from __future__ import annotations
 
 import os
-import sqlite3
 import sys
-import uuid
 from pathlib import Path
 
 import pytest
@@ -62,13 +60,7 @@ def unicode_csv_path() -> Path:
 
 
 @pytest.fixture()
-def in_memory_db():
-    """Yield an isolated in-memory SQLite DB URI and a keeper connection.
-
-    The keeper connection keeps the shared-cache DB alive for the test duration.
-    """
-    db_name = f"test_{uuid.uuid4().hex[:8]}"
-    db_uri = f"file:{db_name}?mode=memory&cache=shared"
-    keeper = sqlite3.connect(db_uri, uri=True)
-    yield db_uri, keeper
-    keeper.close()
+def test_db(tmp_path):
+    """Yield a temporary file-based SQLite DB path, cleaned up automatically by pytest."""
+    db_path = str(tmp_path / "test.db")
+    yield db_path

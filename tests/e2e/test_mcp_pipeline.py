@@ -1,8 +1,6 @@
 """E2E: CSV → SQLite → Repository → Tools (real, no mocks)."""
 
 import json
-import sqlite3
-import uuid
 from unittest.mock import MagicMock
 
 import pytest
@@ -15,19 +13,15 @@ import mcp_tools
 
 
 @pytest.fixture()
-def real_pipeline(sample_csv_path):
-    """Full real pipeline: parse CSV, ingest to SQLite, create repository."""
-    db_name = f"e2e_{uuid.uuid4().hex[:8]}"
-    db_uri = f"file:{db_name}?mode=memory&cache=shared"
-    keeper = sqlite3.connect(db_uri, uri=True)
+def real_pipeline(sample_csv_path, tmp_path):
+    """Full real pipeline: parse CSV, ingest to SQLite file, create repository."""
+    db_path = str(tmp_path / "e2e.db")
 
-    ingester = SqliteIngester(db_uri)
+    ingester = SqliteIngester(db_path)
     result = ingester.ingest(str(sample_csv_path))
-    repo = SqliteRepository(db_uri, result.table_name, result.columns)
+    repo = SqliteRepository(db_path, result.table_name, result.columns)
 
     yield repo, result
-
-    keeper.close()
 
 
 @pytest.fixture()
