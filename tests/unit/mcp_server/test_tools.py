@@ -1,4 +1,4 @@
-"""Tests for mcp-server/src/mcp_tools.py — MCP tool handlers + filter parsing."""
+"""Tests for mcp-server/src/mcp_tools.py — MCP tool handlers."""
 
 import json
 from unittest.mock import AsyncMock, MagicMock
@@ -40,30 +40,6 @@ def _make_mock_repository():
         count=1,
     ))
     return repo
-
-
-class TestParseFilters:
-    def test_none_input(self):
-        assert mcp_tools._parse_filters(None) is None
-
-    def test_empty_list(self):
-        assert mcp_tools._parse_filters([]) is None
-
-    def test_valid_filter(self):
-        filters = [FilterCondition(column="age", op=">", value=30)]
-        result = mcp_tools._parse_filters(filters)
-        assert len(result) == 1
-        assert result[0].column == "age"
-        assert result[0].op == ">"
-        assert result[0].value == 30
-
-    def test_multiple_filters(self):
-        filters = [
-            FilterCondition(column="age", op=">=", value=18),
-            FilterCondition(column="city", value="London"),
-        ]
-        result = mcp_tools._parse_filters(filters)
-        assert len(result) == 2
 
 
 class TestGetSchema:

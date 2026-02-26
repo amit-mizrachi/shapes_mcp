@@ -64,9 +64,8 @@ async def select_rows(
     if order not in ("asc", "desc"):
         return json.dumps({"error": "order must be 'asc' or 'desc'"})
     try:
-        parsed_filters = _parse_filters(filters)
         query_result = await repository.select_rows(
-            filters=parsed_filters, fields=fields, limit=limit,
+            filters=filters, fields=fields, limit=limit,
             order_by=order_by, order=order, distinct=distinct,
         )
     except ValueError as e:
@@ -102,9 +101,8 @@ async def aggregate(
     if order not in ("asc", "desc"):
         return json.dumps({"error": "order must be 'asc' or 'desc'"})
     try:
-        parsed_filters = _parse_filters(filters)
         query_result = await repository.aggregate(
-            operation=operation, field=field, group_by=group_by, filters=parsed_filters, limit=limit,
+            operation=operation, field=field, group_by=group_by, filters=filters, limit=limit,
             order_by=order_by, order=order,
         )
     except ValueError as e:
@@ -118,9 +116,3 @@ def _get_repository(context: Context) -> DataRepositoryProtocol:
         logger.error("Repository not initialized")
         raise RuntimeError("Repository not initialized")
     return repository
-
-
-def _parse_filters(filters: list[FilterCondition] | None) -> list[FilterCondition] | None:
-    if not filters:
-        return None
-    return filters
