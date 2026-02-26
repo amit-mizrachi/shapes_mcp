@@ -1,6 +1,6 @@
 """Tests for shared.modules.chat_response.ChatResponse."""
 
-from shared.modules.chat_response import ChatResponse
+from shared.modules.api.chat_response import ChatResponse
 
 
 class TestChatResponse:

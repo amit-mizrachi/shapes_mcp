@@ -1,6 +1,6 @@
 """Tests for shared.modules.tool_call.ToolCall."""
 
-from shared.modules.tool_call import ToolCall
+from shared.modules.llm.tool_call import ToolCall
 
 
 class TestToolCall:

@@ -1,9 +1,10 @@
 """Tests for shared.modules.ingest_result.IngestResult."""
 
 import pytest
+from pydantic import ValidationError
 
-from shared.modules.ingest_result import IngestResult
-from shared.modules.column_info import ColumnInfo
+from shared.modules.data.ingest_result import IngestResult
+from shared.modules.data.column_info import ColumnInfo
 
 
 class TestIngestResult:
@@ -15,7 +16,7 @@ class TestIngestResult:
 
     def test_frozen(self):
         result = IngestResult(table_name="t", columns=[])
-        with pytest.raises(AttributeError):
+        with pytest.raises(ValidationError):
             result.table_name = "other"
 
     def test_multiple_columns(self):

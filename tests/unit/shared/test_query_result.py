@@ -1,8 +1,9 @@
 """Tests for shared.modules.query_result.QueryResult."""
 
 import pytest
+from pydantic import ValidationError
 
-from shared.modules.query_result import QueryResult
+from shared.modules.data.query_result import QueryResult
 
 
 class TestQueryResult:
@@ -18,7 +19,7 @@ class TestQueryResult:
 
     def test_frozen(self):
         qr = QueryResult(columns=[], rows=[], count=0)
-        with pytest.raises(AttributeError):
+        with pytest.raises(ValidationError):
             qr.count = 5
 
     def test_multiple_rows(self):

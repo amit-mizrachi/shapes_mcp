@@ -3,8 +3,8 @@
 import pytest
 from pydantic import ValidationError
 
-from shared.modules.chat_request import ChatRequest
-from shared.modules.message_item import MessageItem
+from shared.modules.api.chat_request import ChatRequest
+from shared.modules.api.message_item import MessageItem
 
 
 class TestChatRequest:

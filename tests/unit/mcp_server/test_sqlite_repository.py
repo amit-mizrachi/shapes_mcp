@@ -3,9 +3,10 @@
 import sqlite3
 
 import pytest
+from pydantic import ValidationError
 
-from shared.modules.column_info import ColumnInfo
-from shared.modules.filter_condition import FilterCondition
+from shared.modules.data.column_info import ColumnInfo
+from shared.modules.data.filter_condition import FilterCondition
 from repository.sqlite.sqlite_repository import SqliteRepository
 from repository.sqlite.sqlite_ingester import SqliteIngester
 
@@ -100,9 +101,8 @@ class TestSelectRows:
             await repo_with_data.select_rows(filters=filters)
 
     async def test_select_invalid_filter_op_raises(self, repo_with_data):
-        filters = [FilterCondition(column="name", op="!=", value="Alice")]
-        with pytest.raises(ValueError, match="Unknown filter operator"):
-            await repo_with_data.select_rows(filters=filters)
+        with pytest.raises(ValidationError, match="Invalid filter operator"):
+            FilterCondition(column="name", op="!=", value="Alice")
 
     async def test_select_no_filters_returns_all(self, repo_with_data):
         result = await repo_with_data.select_rows(filters=None)
@@ -179,9 +179,8 @@ class TestSQLSafety:
 
     async def test_sql_injection_in_filter_op(self, repo_with_data):
         """Operator injection is blocked by allowlist."""
-        filters = [FilterCondition(column="name", op="= 1; DROP TABLE sample_data; --", value="x")]
-        with pytest.raises(ValueError, match="Unknown filter operator"):
-            await repo_with_data.select_rows(filters=filters)
+        with pytest.raises(ValidationError, match="Invalid filter operator"):
+            FilterCondition(column="name", op="= 1; DROP TABLE sample_data; --", value="x")
 
     async def test_sql_injection_in_field_name(self, repo_with_data):
         with pytest.raises(ValueError, match="not found"):

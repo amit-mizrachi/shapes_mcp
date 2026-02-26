@@ -1,8 +1,9 @@
 """Tests for shared.modules.filter_condition.FilterCondition."""
 
 import pytest
+from pydantic import ValidationError
 
-from shared.modules.filter_condition import FilterCondition
+from shared.modules.data.filter_condition import FilterCondition
 
 
 class TestFilterCondition:
@@ -19,7 +20,7 @@ class TestFilterCondition:
 
     def test_frozen(self):
         f = FilterCondition(column="age", op="=", value=25)
-        with pytest.raises(AttributeError):
+        with pytest.raises(ValidationError):
             f.column = "name"
 
     def test_equality(self):

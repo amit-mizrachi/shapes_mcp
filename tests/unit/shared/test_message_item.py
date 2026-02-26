@@ -1,6 +1,6 @@
 """Tests for shared.modules.message_item.MessageItem."""
 
-from shared.modules.message_item import MessageItem
+from shared.modules.api.message_item import MessageItem
 
 
 class TestMessageItem:

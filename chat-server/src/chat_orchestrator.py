@@ -5,7 +5,7 @@ import json
 import logging
 
 from shared.config import Config
-from shared.modules.chat_result import ChatResult
+from shared.modules.api.chat_response import ChatResponse
 from llm.llm_client import LLMClient
 from mcp_layer.mcp_client import MCPClient
 from mcp_layer.mcp_client_manager import MCPClientManager
@@ -18,7 +18,7 @@ class ChatOrchestrator:
         self._llm = llm_client
         self._mcp = mcp
 
-    async def chat(self, messages: list[dict]) -> ChatResult:
+    async def chat(self, messages: list[dict]) -> ChatResponse:
         try:
             async with self._mcp.client() as mcp:
                 return await asyncio.wait_for(
@@ -26,12 +26,12 @@ class ChatOrchestrator:
                     timeout=Config.get("chat_server.timeout_seconds"),
                 )
         except asyncio.TimeoutError:
-            return ChatResult(answer="The request timed out. Please try a simpler question.")
+            return ChatResponse(answer="The request timed out. Please try a simpler question.")
         except Exception as e:
             logger.error("Orchestration loop failed", exc_info=True)
             raise
 
-    async def _run_loop(self, mcp: MCPClient, user_messages: list[dict]) -> ChatResult:
+    async def _run_loop(self, mcp: MCPClient, user_messages: list[dict]) -> ChatResponse:
         tools = self._mcp.get_tools()
         trace: list[dict] = []
 
@@ -44,7 +44,7 @@ class ChatOrchestrator:
             response = await self._llm.invoke(llm_messages, tools)
 
             if not response.tool_calls:
-                return ChatResult(
+                return ChatResponse(
                     answer=response.text or "I wasn't able to generate a response.",
                     tool_calls=trace,
                 )
@@ -82,7 +82,7 @@ class ChatOrchestrator:
 
             llm_messages.append({"role": "user", "content": tool_results})
 
-        return ChatResult(
+        return ChatResponse(
             answer="I reached the maximum number of steps. Please try rephrasing your question.",
             tool_calls=trace,
         )

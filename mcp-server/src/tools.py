@@ -6,19 +6,19 @@ import logging
 from mcp.server.fastmcp import Context
 
 from shared.config import Config
-from shared.modules.filter_condition import FilterCondition
+from shared.modules.data.filter_condition import FilterCondition
 from repository.data_repository import DataRepository
 
 logger = logging.getLogger(__name__)
 
 
-async def get_schema(ctx: Context) -> str:
+async def get_schema(context: Context) -> str:
     """Return the database schema: table name, column names, detected types, and sample values.
 
     Use this tool FIRST to understand what data is available before querying.
     Takes no parameters.
     """
-    repository = _get_repository(ctx)
+    repository = _get_repository(context)
     schema = await repository.get_schema()
     if schema is None:
         logger.warning("get_schema called but no data is loaded")
@@ -41,7 +41,7 @@ async def select_rows(
     order_by: str | None = None,
     order: str = "asc",
     distinct: bool = False,
-    ctx: Context = None,
+    context: Context = None,
 ) -> str:
     """Retrieve rows from the data table.
 
@@ -59,7 +59,7 @@ async def select_rows(
     - distinct: if true, return only unique combinations of the selected fields.
     """
     logger.info("Executing row selection tool")
-    repository = _get_repository(ctx)
+    repository = _get_repository(context)
     order = order.lower()
     if order not in ("asc", "desc"):
         return json.dumps({"error": "order must be 'asc' or 'desc'"})
@@ -83,7 +83,7 @@ async def aggregate(
     limit: int = Config.get("shared.default_query_limit"),
     order_by: str | None = None,
     order: str = "desc",
-    ctx: Context = None,
+    context: Context = None,
 ) -> str:
     """Run an aggregation on the data table.
 
@@ -97,7 +97,7 @@ async def aggregate(
     - order: "asc" or "desc" (default "desc").
     """
     logger.info("Executing aggregation tool")
-    repository = _get_repository(ctx)
+    repository = _get_repository(context)
     order = order.lower()
     if order not in ("asc", "desc"):
         return json.dumps({"error": "order must be 'asc' or 'desc'"})
@@ -112,15 +112,15 @@ async def aggregate(
         return json.dumps({"error": str(e)})
     return json.dumps({"data": query_result.rows, "count": query_result.count})
 
-def _get_repository(ctx: Context) -> DataRepository:
-    repository = ctx.request_context.lifespan_context.get("repository")
+def _get_repository(context: Context) -> DataRepository:
+    repository = context.request_context.lifespan_context.get("repository")
     if repository is None:
         logger.error("Repository not initialized")
         raise RuntimeError("Repository not initialized")
     return repository
 
 
-def _parse_filters(raw: list[dict] | None) -> list[FilterCondition] | None:
+def _parse_filters(raw: list[dict] | None) -> list[FilterCondition] | None: # TODO: Do we need this if we make sure filters are sent as FilterCondition?
     if not raw:
         return None
     conditions: list[FilterCondition] = []

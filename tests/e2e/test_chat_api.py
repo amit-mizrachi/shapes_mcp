@@ -9,9 +9,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from shared.modules.chat_result import ChatResult
-from shared.modules.llm_response import LLMResponse
-from shared.modules.tool_call import ToolCall
+from shared.modules.api.chat_response import ChatResponse
+from shared.modules.llm.llm_response import LLMResponse
+from shared.modules.llm.tool_call import ToolCall
 from repository.sqlite.sqlite_ingester import SqliteIngester
 from repository.sqlite.sqlite_repository import SqliteRepository
 
@@ -99,9 +99,9 @@ def _make_tool_caller(repo):
         if name == "get_schema":
             return await tools.get_schema(ctx)
         elif name == "select_rows":
-            return await tools.select_rows(**arguments, ctx=ctx)
+            return await tools.select_rows(**arguments, context=ctx)
         elif name == "aggregate":
-            return await tools.aggregate(**arguments, ctx=ctx)
+            return await tools.aggregate(**arguments, context=ctx)
         return json.dumps({"error": f"Unknown tool: {name}"})
 
     return call_tool

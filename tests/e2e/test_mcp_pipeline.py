@@ -10,7 +10,7 @@ import pytest
 from repository.csv_parser import CSVParser
 from repository.sqlite.sqlite_ingester import SqliteIngester
 from repository.sqlite.sqlite_repository import SqliteRepository
-from shared.modules.filter_condition import FilterCondition
+from shared.modules.data.filter_condition import FilterCondition
 import tools
 
 
@@ -109,34 +109,34 @@ class TestToolsE2E:
         assert len(result["columns"]) == 5
 
     async def test_select_rows_tool(self, real_ctx):
-        result = json.loads(await tools.select_rows(ctx=real_ctx))
+        result = json.loads(await tools.select_rows(context=real_ctx))
         assert result["count"] == 5
 
     async def test_select_rows_with_filters(self, real_ctx):
         filters = [{"column": "name", "op": "=", "value": "Alice"}]
-        result = json.loads(await tools.select_rows(filters=filters, ctx=real_ctx))
+        result = json.loads(await tools.select_rows(filters=filters, context=real_ctx))
         assert result["count"] == 1
         assert result["data"][0]["name"] == "Alice"
 
     async def test_select_rows_with_fields(self, real_ctx):
-        result = json.loads(await tools.select_rows(fields=["name", "city"], ctx=real_ctx))
+        result = json.loads(await tools.select_rows(fields=["name", "city"], context=real_ctx))
         row = result["data"][0]
         assert "name" in row
         assert "city" in row
 
     async def test_aggregate_tool(self, real_ctx):
-        result = json.loads(await tools.aggregate(op="count", ctx=real_ctx))
+        result = json.loads(await tools.aggregate(operation="count", context=real_ctx))
         assert result["data"][0]["result"] == 5
 
     async def test_aggregate_with_group_by(self, real_ctx):
-        result = json.loads(await tools.aggregate(op="count", group_by="active", ctx=real_ctx))
+        result = json.loads(await tools.aggregate(operation="count", group_by="active", context=real_ctx))
         assert result["count"] >= 2
 
     async def test_invalid_filter_returns_error(self, real_ctx):
         filters = [{"column": "bad_col", "op": "=", "value": "x"}]
-        result = json.loads(await tools.select_rows(filters=filters, ctx=real_ctx))
+        result = json.loads(await tools.select_rows(filters=filters, context=real_ctx))
         assert "error" in result
 
     async def test_invalid_aggregate_returns_error(self, real_ctx):
-        result = json.loads(await tools.aggregate(op="median", field="age", ctx=real_ctx))
+        result = json.loads(await tools.aggregate(operation="median", field="age", context=real_ctx))
         assert "error" in result

@@ -1,8 +1,9 @@
 """Tests for shared.modules.column_info.ColumnInfo."""
 
 import pytest
+from pydantic import ValidationError
 
-from shared.modules.column_info import ColumnInfo
+from shared.modules.data.column_info import ColumnInfo
 
 
 class TestColumnInfo:
@@ -18,7 +19,7 @@ class TestColumnInfo:
 
     def test_frozen(self):
         col = ColumnInfo(name="age", detected_type="numeric")
-        with pytest.raises(AttributeError):
+        with pytest.raises(ValidationError):
             col.name = "new_name"
 
     def test_equality(self):

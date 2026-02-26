@@ -1,9 +1,10 @@
 """Tests for shared.modules.table_schema.TableSchema."""
 
 import pytest
+from pydantic import ValidationError
 
-from shared.modules.table_schema import TableSchema
-from shared.modules.column_info import ColumnInfo
+from shared.modules.data.table_schema import TableSchema
+from shared.modules.data.column_info import ColumnInfo
 
 
 class TestTableSchema:
@@ -15,7 +16,7 @@ class TestTableSchema:
 
     def test_frozen(self):
         schema = TableSchema(table_name="t", columns=[])
-        with pytest.raises(AttributeError):
+        with pytest.raises(ValidationError):
             schema.table_name = "other"
 
     def test_column_access(self):

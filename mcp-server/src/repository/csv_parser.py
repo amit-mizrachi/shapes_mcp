@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 
 from shared.config import Config
-from shared.modules.column_info import ColumnInfo
+from shared.modules.data.column_info import ColumnInfo
 
 class CSVParser:
     @staticmethod

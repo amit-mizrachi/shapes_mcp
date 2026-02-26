@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from shared.modules.filter_condition import FilterCondition
-from shared.modules.table_schema import TableSchema
-from shared.modules.query_result import QueryResult
+from shared.modules.data.filter_condition import FilterCondition
+from shared.modules.data.table_schema import TableSchema
+from shared.modules.data.query_result import QueryResult
 
 
 @runtime_checkable

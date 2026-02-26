@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from shared.modules.chat_result import ChatResult
+from shared.modules.api.chat_response import ChatResponse
 
 
 @pytest.fixture()
@@ -23,7 +23,7 @@ def app_with_mocks():
         mock_llm_cls.return_value = mock_llm
 
         mock_orch = MagicMock()
-        mock_orch.chat = AsyncMock(return_value=ChatResult(answer="Test reply"))
+        mock_orch.chat = AsyncMock(return_value=ChatResponse(answer="Test reply"))
         mock_orch_cls.return_value = mock_orch
 
         import main
@@ -101,7 +101,7 @@ class TestChat:
         assert resp.status_code == 500
 
     async def test_chat_with_tool_calls(self, client, mock_orchestrator):
-        mock_orchestrator.chat = AsyncMock(return_value=ChatResult(
+        mock_orchestrator.chat = AsyncMock(return_value=ChatResponse(
             answer="Found data",
             tool_calls=[{"tool": "get_schema", "result": "ok"}],
         ))

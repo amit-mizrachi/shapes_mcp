@@ -9,8 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from shared.config import Config
 from chat_orchestrator import ChatOrchestrator
-from shared.modules.chat_request import ChatRequest
-from shared.modules.chat_response import ChatResponse
+from shared.modules.api.chat_request import ChatRequest
+from shared.modules.api.chat_response import ChatResponse
 from mcp_layer.mcp_client_manager import MCPClientManager
 from llm.claude_llm_client import ClaudeLLMClient
 
@@ -74,8 +74,7 @@ async def chat(request: ChatRequest):
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
 
     try:
-        result = await orchestrator.chat(messages)
-        return ChatResponse(answer=result.answer, tool_calls=result.tool_calls)
+        return await orchestrator.chat(messages)
     except ConnectionError as e:
         logger.warning("MCP connection error")
         raise HTTPException(status_code=503, detail="Server busy. Please try again shortly.")

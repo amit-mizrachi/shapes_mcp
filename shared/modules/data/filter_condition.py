@@ -1,17 +1,21 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from pydantic import ConfigDict, model_validator
+
+from shared.modules.shapes_base_model import ShapesBaseModel
 
 VALID_OPERATORS = frozenset({"=", ">", ">=", "<", "<=", "LIKE", "IN"})
 
 
-@dataclass(frozen=True)
-class FilterCondition:
+class FilterCondition(ShapesBaseModel):
+    model_config = ConfigDict(frozen=True)
+
     column: str
     op: str = "="
     value: str | int | float | list = ""
 
-    def __post_init__(self) -> None:
+    @model_validator(mode="after")
+    def _validate(self) -> FilterCondition:
         if not self.column or not isinstance(self.column, str):
             raise ValueError(
                 f"FilterCondition 'column' must be a non-empty string. Got: {self.column!r}"
@@ -30,3 +34,4 @@ class FilterCondition:
                 raise ValueError(
                     f"LIKE operator requires a string 'value'. Got: {self.value!r}"
                 )
+        return self

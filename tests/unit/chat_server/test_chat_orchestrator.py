@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from shared.modules.llm_response import LLMResponse
-from shared.modules.tool_call import ToolCall
+from shared.modules.llm.llm_response import LLMResponse
+from shared.modules.llm.tool_call import ToolCall
 from chat_orchestrator import ChatOrchestrator
 
 
