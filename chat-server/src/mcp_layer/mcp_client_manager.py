@@ -5,6 +5,7 @@ import logging
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 
+from config import Config
 from .mcp_client import MCPClient
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ class MCPClientManager:
     async def client(self) -> AsyncIterator[MCPClient]:
         """Create an ephemeral client, gated by semaphore."""
         try:
-            await asyncio.wait_for(self._semaphore.acquire(), timeout=30.0)
+            await asyncio.wait_for(self._semaphore.acquire(), timeout=Config.get("chat_server.semaphore_timeout"))
         except asyncio.TimeoutError:
             raise ConnectionError("MCP server busy (max concurrent requests reached)")
         try:

@@ -4,12 +4,12 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 WORKDIR /app
 
-COPY chat-backend/requirements.txt .
+COPY chat-server/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY shared/config.py ./config.py
 COPY shared/ ./shared/
-COPY chat-backend/src/ .
+COPY chat-server/src/ .
 
 USER appuser
 

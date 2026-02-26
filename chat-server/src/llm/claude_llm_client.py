@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import anthropic
+from config import Config
 from llm.llm_client import LLMClient
 from shared.modules.llm_response import LLMResponse
 from shared.modules.tool_call import ToolCall
@@ -35,7 +36,7 @@ class ClaudeLLMClient(LLMClient):
 
         kwargs = {
             "model": self._model,
-            "max_tokens": 4096,
+            "max_tokens": Config.get("chat_server.max_tokens"),
             "messages": api_messages,
         }
         if system:

@@ -23,7 +23,7 @@ services:
   chat-backend:
     build:
       context: .
-      dockerfile: chat-backend/Dockerfile
+      dockerfile: chat-server/Dockerfile
     expose:
       - "3002"
     environment:

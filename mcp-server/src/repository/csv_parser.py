@@ -5,6 +5,7 @@ import os
 import re
 from dataclasses import dataclass
 
+from config import Config
 from shared.modules.column_info import ColumnInfo
 
 class CSVParser:
@@ -25,7 +26,7 @@ class CSVParser:
                 pass
         if total == 0:
             return "text"
-        return "numeric" if numeric_count / total > 0.8 else "text"
+        return "numeric" if numeric_count / total > Config.get("mcp_server.numeric_threshold") else "text"
 
     @staticmethod
     def csv_filename_to_table_name(csv_path: str) -> str:

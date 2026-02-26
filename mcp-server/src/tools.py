@@ -5,6 +5,7 @@ import logging
 
 from mcp.server.fastmcp import Context
 
+from config import Config
 from repository.data_repository import DataRepository
 
 logger = logging.getLogger(__name__)
@@ -44,7 +45,7 @@ async def get_schema(ctx: Context) -> str:
 async def select_rows(
     filters: dict[str, str | int | float] | None = None,
     fields: list[str] | None = None,
-    limit: int = 20,
+    limit: int = Config.get("shared.default_query_limit"),
     ctx: Context = None,
 ) -> str:
     """Retrieve rows from the data table.
@@ -70,7 +71,7 @@ async def aggregate(
     field: str | None = None,
     group_by: str | None = None,
     filters: dict[str, str | int | float] | None = None,
-    limit: int = 20,
+    limit: int = Config.get("shared.default_query_limit"),
     ctx: Context = None,
 ) -> str:
     """Run an aggregation on the data table.

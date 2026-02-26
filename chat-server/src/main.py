@@ -7,14 +7,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from config import config
+from config import Config
 from chat_orchestrator import ChatOrchestrator
 from shared.modules.chat_request import ChatRequest
 from shared.modules.chat_response import ChatResponse
 from mcp_layer.mcp_client_manager import MCPClientManager
 from llm.claude_llm_client import ClaudeLLMClient
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logging.basicConfig(level=Config.get("shared.log_level"), format=Config.get("shared.log_format"))
 logger = logging.getLogger(__name__)
 
 mcp_manager: MCPClientManager | None = None
@@ -26,35 +26,36 @@ async def lifespan(app: FastAPI):
     global mcp_manager, orchestrator
 
     mcp_manager = MCPClientManager(
-        url=config.mcp_server_url,
-        max_concurrent=config.mcp_max_concurrent,
+        url=Config.get("chat_server.mcp_server_url"),
+        max_concurrent=Config.get("chat_server.mcp_max_concurrent"),
     )
 
-    for attempt in range(10):
+    retry_attempts = Config.get("chat_server.retry_attempts")
+    for attempt in range(retry_attempts):
         try:
             await mcp_manager.initialize()
             logger.info("MCP client ready")
             break
         except Exception as e:
             logger.warning("MCP connection attempt failed, retrying")
-            if attempt < 9:
-                await asyncio.sleep(3)
+            if attempt < retry_attempts - 1:
+                await asyncio.sleep(Config.get("chat_server.retry_sleep"))
             else:
                 raise RuntimeError("Could not connect to MCP server") from e
 
-    llm_client = ClaudeLLMClient(model=config.anthropic_model)
+    llm_client = ClaudeLLMClient(model=Config.get("chat_server.anthropic_model"))
     orchestrator = ChatOrchestrator(llm_client, mcp_manager)
-    logger.info("Chat backend started")
+    logger.info("Chat server started")
     yield
 
 
-app = FastAPI(title="Chat Backend", lifespan=lifespan)
+app = FastAPI(title="Chat Server", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
-    allow_methods=["POST", "GET"],
-    allow_headers=["Content-Type"],
+    allow_origins=Config.get("chat_server.cors_origins"),
+    allow_methods=Config.get("chat_server.cors_methods"),
+    allow_headers=Config.get("chat_server.cors_headers"),
 )
 
 
@@ -65,9 +66,10 @@ async def health():
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
+    max_length = Config.get("chat_server.message_max_length")
     for msg in request.messages:
-        if len(msg.content) > 5000:
-            raise HTTPException(status_code=422, detail="Message content exceeds 5000 character limit.")
+        if len(msg.content) > max_length:
+            raise HTTPException(status_code=422, detail=f"Message content exceeds {max_length} character limit.")
 
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
 

@@ -4,25 +4,13 @@ import asyncio
 import json
 import logging
 
+from config import Config
 from shared.modules.chat_result import ChatResult
 from llm.llm_client import LLMClient
 from mcp_layer.mcp_client import MCPClient
 from mcp_layer.mcp_client_manager import MCPClientManager
 
 logger = logging.getLogger(__name__)
-
-SYSTEM_PROMPT = """You are a helpful data analyst assistant. You have access to a database loaded from a CSV file.
-
-IMPORTANT WORKFLOW:
-1. ALWAYS call get_schema() first to understand what table, columns, and data types are available.
-2. Use select_rows() to retrieve and inspect raw data rows.
-3. Use aggregate() for counts, sums, averages, and group-by analysis.
-4. Present results clearly and concisely. Use markdown tables when showing tabular data.
-
-Always base your answers on actual query results, not assumptions."""
-
-MAX_ITERATIONS = 10
-TIMEOUT_SECONDS = 120
 
 
 class ChatOrchestrator:
@@ -35,7 +23,7 @@ class ChatOrchestrator:
             async with self._mcp.client() as mcp:
                 return await asyncio.wait_for(
                     self._run_loop(mcp, messages),
-                    timeout=TIMEOUT_SECONDS,
+                    timeout=Config.get("chat_server.timeout_seconds"),
                 )
         except asyncio.TimeoutError:
             return ChatResult(answer="The request timed out. Please try a simpler question.")
@@ -48,11 +36,11 @@ class ChatOrchestrator:
         trace: list[dict] = []
 
         llm_messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": Config.get("chat_server.system_prompt")},
             *user_messages,
         ]
 
-        for _ in range(MAX_ITERATIONS):
+        for _ in range(Config.get("chat_server.max_iterations")):
             response = await self._llm.invoke(llm_messages, tools)
 
             if not response.tool_calls:
