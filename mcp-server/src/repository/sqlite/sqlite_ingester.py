@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from repository.csv_parser import CSVParser
+from repository.csv_parser import CSVParser, ParsedCSV
 from shared.modules.data.ingest_result import IngestResult
 
 
@@ -23,7 +23,7 @@ class SqliteIngester:
 
         return IngestResult(table_name=parsed_csv.table_name, columns=parsed_csv.columns)
 
-    def _create_table(self, connection: sqlite3.Connection, parsed: CSVParser.ParsedCSV) -> None:
+    def _create_table(self, connection: sqlite3.Connection, parsed: ParsedCSV) -> None:
         column_defs = ", ".join(
             f'"{col.name}" {"REAL" if col.detected_type == "numeric" else "TEXT"}'
             for col in parsed.columns
@@ -32,7 +32,7 @@ class SqliteIngester:
         cursor.execute(f'DROP TABLE IF EXISTS "{parsed.table_name}"')
         cursor.execute(f'CREATE TABLE "{parsed.table_name}" ({column_defs})')
 
-    def _insert_rows(self, connection: sqlite3.Connection, parsed_csv: CSVParser.ParsedCSV) -> None:
+    def _insert_rows(self, connection: sqlite3.Connection, parsed_csv: ParsedCSV) -> None:
         column_types = {c.name: c.detected_type for c in parsed_csv.columns}
         placeholders = ", ".join("?" for _ in parsed_csv.headers)
         cursor = connection.cursor()

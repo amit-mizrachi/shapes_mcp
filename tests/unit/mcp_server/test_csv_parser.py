@@ -2,7 +2,7 @@
 
 import pytest
 
-from repository.csv_parser import CSVParser
+from repository.csv_parser import CSVParser, ParsedCSV
 
 
 class TestDetectColumnType:
@@ -57,27 +57,27 @@ class TestDetectColumnType:
         assert CSVParser.detect_column_type([]) == "text"
 
 
-class TestCsvFilenameToTableName:
+class TestPathToTableName:
     def test_simple_name(self):
-        assert CSVParser.csv_filename_to_table_name("data.csv") == "data"
+        assert CSVParser.path_to_table_name("data.csv") == "data"
 
     def test_dashes_and_spaces(self):
-        assert CSVParser.csv_filename_to_table_name("my-data file.csv") == "my_data_file"
+        assert CSVParser.path_to_table_name("my-data file.csv") == "my_data_file"
 
     def test_full_path(self):
-        assert CSVParser.csv_filename_to_table_name("/home/user/people-list-export.csv") == "people_list_export"
+        assert CSVParser.path_to_table_name("/home/user/people-list-export.csv") == "people_list_export"
 
     def test_uppercase(self):
-        assert CSVParser.csv_filename_to_table_name("MyData.CSV") == "mydata"
+        assert CSVParser.path_to_table_name("MyData.CSV") == "mydata"
 
     def test_special_characters(self):
-        assert CSVParser.csv_filename_to_table_name("data@2024#v1.csv") == "data_2024_v1"
+        assert CSVParser.path_to_table_name("data@2024#v1.csv") == "data_2024_v1"
 
     def test_empty_after_sanitization(self):
-        assert CSVParser.csv_filename_to_table_name("@@@.csv") == "data"
+        assert CSVParser.path_to_table_name("@@@.csv") == "data"
 
     def test_numbers_only(self):
-        assert CSVParser.csv_filename_to_table_name("12345.csv") == "12345"
+        assert CSVParser.path_to_table_name("12345.csv") == "12345"
 
 
 class TestParse:
@@ -123,3 +123,7 @@ class TestParse:
         assert len(parsed.rows) == 4
         names = [r["name"] for r in parsed.rows]
         assert "Müller" in names
+
+    def test_parsed_csv_is_dataclass(self, sample_csv_path):
+        parsed = CSVParser.parse(str(sample_csv_path))
+        assert isinstance(parsed, ParsedCSV)

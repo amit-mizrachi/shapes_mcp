@@ -55,12 +55,11 @@ class SqliteRepository:
         order_by: Optional[str] = None,
         order: str = "desc",
     ) -> QueryResult:
-        sql_operation = self._validate_aggregation_args(operation, field, group_by)
+        validated_sql_operation = self._validate_aggregation_args(operation, field, group_by)
+        aggregation_expression = self._build_aggregation_expression(validated_sql_operation, field)
+
         where_clause, params = self._build_where_clause(filters)
-        aggregation_expression = self._build_aggregation_expression(sql_operation, field)
-        sql_query, params = self._build_aggregated_sql_query(
-            aggregation_expression, where_clause, params, group_by, limit, order_by, order,
-        )
+        sql_query, params = self._build_aggregated_sql_query(aggregation_expression, where_clause, params, group_by, limit, order_by, order)
 
         return await self._run_query(sql_query, params)
 
