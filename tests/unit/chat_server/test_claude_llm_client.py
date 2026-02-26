@@ -44,6 +44,61 @@ class TestConvertTools:
         assert client._convert_tools([]) == []
 
 
+class TestConvertMessages:
+    def _client(self):
+        return ClaudeLLMClient(model="test-model", max_tokens=4096)
+
+    def test_system_message_extracted(self):
+        system, msgs = self._client()._convert_messages([
+            {"role": "system", "content": "Be helpful"},
+            {"role": "user", "content": "hi"},
+        ])
+        assert system == "Be helpful"
+        assert len(msgs) == 1
+        assert msgs[0]["role"] == "user"
+
+    def test_plain_user_passthrough(self):
+        system, msgs = self._client()._convert_messages([
+            {"role": "user", "content": "hello"},
+        ])
+        assert system is None
+        assert msgs == [{"role": "user", "content": "hello"}]
+
+    def test_tool_call_translated_to_tool_use(self):
+        _, msgs = self._client()._convert_messages([
+            {"role": "assistant", "content": [
+                {"type": "text", "text": "Calling tool"},
+                {"type": "tool_call", "id": "tc_1", "name": "get_schema", "arguments": {"x": 1}},
+            ]},
+        ])
+        assert len(msgs) == 1
+        blocks = msgs[0]["content"]
+        assert blocks[0] == {"type": "text", "text": "Calling tool"}
+        assert blocks[1] == {"type": "tool_use", "id": "tc_1", "name": "get_schema", "input": {"x": 1}}
+
+    def test_tool_role_translated_to_user_with_tool_use_id(self):
+        _, msgs = self._client()._convert_messages([
+            {"role": "tool", "content": [
+                {"type": "tool_result", "tool_call_id": "tc_1", "name": "get_schema", "content": "ok"},
+            ]},
+        ])
+        assert len(msgs) == 1
+        assert msgs[0]["role"] == "user"
+        part = msgs[0]["content"][0]
+        assert part["tool_use_id"] == "tc_1"
+        assert "tool_call_id" not in part
+
+    def test_error_tool_result_preserved(self):
+        _, msgs = self._client()._convert_messages([
+            {"role": "tool", "content": [
+                {"type": "tool_result", "tool_call_id": "tc_1", "name": "fail", "content": "boom", "is_error": True},
+            ]},
+        ])
+        part = msgs[0]["content"][0]
+        assert part["is_error"] is True
+        assert part["content"] == "boom"
+
+
 class TestInvoke:
     @pytest.fixture()
     def mock_anthropic(self):

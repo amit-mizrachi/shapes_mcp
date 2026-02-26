@@ -24,15 +24,44 @@ class ClaudeLLMClient(BaseLLMClient):
             })
         return claude_tools
 
-    async def invoke(self, messages: list[dict], tools: list[dict]) -> LLMResponse:
-        # Separate system message if present
+    def _convert_messages(self, messages: list[dict]) -> tuple[str | None, list[dict]]:
+        """Translate provider-agnostic messages to Claude's format."""
         system = None
         api_messages = []
         for msg in messages:
-            if msg["role"] == "system":
+            role = msg["role"]
+            if role == "system":
                 system = msg["content"]
+            elif role == "tool":
+                # Tool results: neutral role "tool" → Claude role "user"
+                converted_parts = []
+                for part in msg["content"]:
+                    converted = dict(part)
+                    converted["type"] = "tool_result"
+                    if "tool_call_id" in converted:
+                        converted["tool_use_id"] = converted.pop("tool_call_id")
+                    converted_parts.append(converted)
+                api_messages.append({"role": "user", "content": converted_parts})
+            elif role == "assistant" and isinstance(msg.get("content"), list):
+                # Assistant message with tool calls: neutral → Claude
+                converted_parts = []
+                for part in msg["content"]:
+                    if part.get("type") == "tool_call":
+                        converted_parts.append({
+                            "type": "tool_use",
+                            "id": part["id"],
+                            "name": part["name"],
+                            "input": part["arguments"],
+                        })
+                    else:
+                        converted_parts.append(part)
+                api_messages.append({"role": "assistant", "content": converted_parts})
             else:
                 api_messages.append(msg)
+        return system, api_messages
+
+    async def invoke(self, messages: list[dict], tools: list[dict]) -> LLMResponse:
+        system, api_messages = self._convert_messages(messages)
 
         kwargs = {
             "model": self._model,

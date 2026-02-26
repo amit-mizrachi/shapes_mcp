@@ -1,0 +1,215 @@
+"""Tests for chat-server/src/llm_client/gemini/gemini_llm_client.py — tool conversion, message conversion, invoke."""
+
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from google.genai import types
+
+from llm_client.gemini.gemini_llm_client import GeminiLLMClient
+
+
+# ── Helpers ──────────────────────────────────────────────────────────────────
+
+def _make_response(parts, finish_reason="STOP"):
+    """Build a minimal GenerateContentResponse-like object."""
+    candidate = SimpleNamespace(
+        content=SimpleNamespace(parts=parts),
+        finish_reason=finish_reason,
+    )
+    return SimpleNamespace(candidates=[candidate], prompt_feedback=None)
+
+
+def _text_part(text: str):
+    return SimpleNamespace(text=text, function_call=None)
+
+
+def _fc_part(name: str, args: dict, id: str | None = None):
+    return SimpleNamespace(
+        text=None,
+        function_call=SimpleNamespace(id=id, name=name, args=args),
+    )
+
+
+# ── TestConvertTools ─────────────────────────────────────────────────────────
+
+class TestConvertTools:
+    def test_converts_mcp_to_gemini_format(self):
+        mcp_tools = [
+            {
+                "name": "get_schema",
+                "description": "Get schema",
+                "inputSchema": {"type": "object", "properties": {}},
+            }
+        ]
+        result = GeminiLLMClient._convert_tools(mcp_tools)
+        assert len(result) == 1
+        decls = result[0].function_declarations
+        assert len(decls) == 1
+        assert decls[0].name == "get_schema"
+        assert decls[0].description == "Get schema"
+
+    def test_multiple_tools(self):
+        mcp_tools = [
+            {"name": "tool_a", "description": "A", "inputSchema": {}},
+            {"name": "tool_b", "description": "B", "inputSchema": {}},
+        ]
+        result = GeminiLLMClient._convert_tools(mcp_tools)
+        assert len(result[0].function_declarations) == 2
+
+    def test_empty_tools(self):
+        result = GeminiLLMClient._convert_tools([])
+        assert result[0].function_declarations == []
+
+
+# ── TestConvertMessages ──────────────────────────────────────────────────────
+
+class TestConvertMessages:
+    def test_system_message_extracted(self):
+        system, contents = GeminiLLMClient._convert_messages([
+            {"role": "system", "content": "Be helpful"},
+            {"role": "user", "content": "hi"},
+        ])
+        assert system == "Be helpful"
+        assert len(contents) == 1
+        assert contents[0].role == "user"
+
+    def test_user_message(self):
+        _, contents = GeminiLLMClient._convert_messages([
+            {"role": "user", "content": "hello"},
+        ])
+        assert len(contents) == 1
+        assert contents[0].role == "user"
+        assert contents[0].parts[0].text == "hello"
+
+    def test_assistant_text_message(self):
+        _, contents = GeminiLLMClient._convert_messages([
+            {"role": "assistant", "content": "I can help"},
+        ])
+        assert len(contents) == 1
+        assert contents[0].role == "model"
+        assert contents[0].parts[0].text == "I can help"
+
+    def test_assistant_tool_call_message(self):
+        _, contents = GeminiLLMClient._convert_messages([
+            {"role": "assistant", "content": [
+                {"type": "text", "text": "Let me check"},
+                {"type": "tool_call", "id": "tc_1", "name": "get_schema", "arguments": {"x": 1}},
+            ]},
+        ])
+        assert len(contents) == 1
+        assert contents[0].role == "model"
+        parts = contents[0].parts
+        assert parts[0].text == "Let me check"
+        fc = parts[1].function_call
+        assert fc.name == "get_schema"
+        assert fc.args == {"x": 1}
+        assert fc.id == "tc_1"
+
+    def test_tool_result_message(self):
+        _, contents = GeminiLLMClient._convert_messages([
+            {"role": "tool", "content": [
+                {"type": "tool_result", "tool_call_id": "tc_1", "name": "get_schema", "content": "ok"},
+            ]},
+        ])
+        assert len(contents) == 1
+        assert contents[0].role == "user"
+        fr = contents[0].parts[0].function_response
+        assert fr.name == "get_schema"
+        assert fr.id == "tc_1"
+        assert fr.response == {"result": "ok"}
+
+    def test_no_system_returns_none(self):
+        system, _ = GeminiLLMClient._convert_messages([
+            {"role": "user", "content": "hi"},
+        ])
+        assert system is None
+
+
+# ── TestInvoke ───────────────────────────────────────────────────────────────
+
+class TestInvoke:
+    @pytest.fixture()
+    def mock_genai(self):
+        with patch("llm_client.gemini.gemini_llm_client.genai") as mock_mod:
+            mock_client = MagicMock()
+            mock_mod.Client.return_value = mock_client
+            mock_client.aio.models.generate_content = AsyncMock()
+            yield mock_client
+
+    async def test_text_only_response(self, mock_genai):
+        mock_genai.aio.models.generate_content.return_value = _make_response([
+            _text_part("Hello world"),
+        ])
+        client = GeminiLLMClient(model="gemini-2.5-flash", max_tokens=4096)
+        result = await client.invoke(
+            messages=[{"role": "user", "content": "hi"}],
+            tools=[],
+        )
+        assert result.text == "Hello world"
+        assert result.tool_calls == []
+
+    async def test_function_call_response(self, mock_genai):
+        mock_genai.aio.models.generate_content.return_value = _make_response([
+            _text_part("Let me check"),
+            _fc_part("get_schema", {}, id="gc_1"),
+        ])
+        client = GeminiLLMClient(model="gemini-2.5-flash", max_tokens=4096)
+        result = await client.invoke(
+            messages=[{"role": "user", "content": "show schema"}],
+            tools=[{"name": "get_schema", "description": "x", "inputSchema": {}}],
+        )
+        assert result.text == "Let me check"
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].name == "get_schema"
+        assert result.tool_calls[0].id == "gc_1"
+
+    async def test_function_call_id_fallback(self, mock_genai):
+        mock_genai.aio.models.generate_content.return_value = _make_response([
+            _fc_part("get_schema", {}, id=None),
+        ])
+        client = GeminiLLMClient(model="gemini-2.5-flash", max_tokens=4096)
+        result = await client.invoke(
+            messages=[{"role": "user", "content": "schema"}],
+            tools=[],
+        )
+        assert result.tool_calls[0].id.startswith("gemini_")
+        assert len(result.tool_calls[0].id) == len("gemini_") + 12
+
+    async def test_system_instruction_passed(self, mock_genai):
+        mock_genai.aio.models.generate_content.return_value = _make_response([
+            _text_part("ok"),
+        ])
+        client = GeminiLLMClient(model="gemini-2.5-flash", max_tokens=4096)
+        await client.invoke(
+            messages=[
+                {"role": "system", "content": "You are helpful"},
+                {"role": "user", "content": "hi"},
+            ],
+            tools=[],
+        )
+        call_kwargs = mock_genai.aio.models.generate_content.call_args.kwargs
+        assert call_kwargs["config"].system_instruction == "You are helpful"
+
+    async def test_empty_candidates_raises(self, mock_genai):
+        mock_genai.aio.models.generate_content.return_value = SimpleNamespace(
+            candidates=[], prompt_feedback="BLOCKED",
+        )
+        client = GeminiLLMClient(model="gemini-2.5-flash", max_tokens=4096)
+        with pytest.raises(RuntimeError, match="no candidates"):
+            await client.invoke(
+                messages=[{"role": "user", "content": "hi"}],
+                tools=[],
+            )
+
+    async def test_multiple_text_parts_concatenated(self, mock_genai):
+        mock_genai.aio.models.generate_content.return_value = _make_response([
+            _text_part("Hello"),
+            _text_part("World"),
+        ])
+        client = GeminiLLMClient(model="gemini-2.5-flash", max_tokens=4096)
+        result = await client.invoke(
+            messages=[{"role": "user", "content": "hi"}],
+            tools=[],
+        )
+        assert result.text == "Hello\nWorld"

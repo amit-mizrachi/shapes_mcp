@@ -17,8 +17,11 @@ class Config:
         # ── Chat Server ──
         "chat_server.mcp_server_url":     "http://mcp-server:3001/mcp",
         "chat_server.mcp_max_concurrent": 10,
+        "chat_server.llm_provider":       "claude",
         "chat_server.anthropic_model":    "claude-sonnet-4-20250514",
         "chat_server.max_tokens":         4096,
+        "chat_server.gemini_model":       "gemini-2.5-flash",
+        "chat_server.gemini_max_tokens":  4096,
         "chat_server.timeout_seconds":    120,
         "chat_server.max_iterations":     10,
         "chat_server.semaphore_timeout":  30.0,

@@ -41,7 +41,7 @@ class AgentLoopOrchestrator:
 
             messages.append(self._build_assistant_message(llm_response))
             tool_results = await self._execute_tool_calls(llm_response.tool_calls, tool_call_history)
-            messages.append({"role": "user", "content": tool_results})
+            messages.append({"role": "tool", "content": tool_results})
 
         logger.warning("Max iterations (%d) reached", self._max_iterations)
         return ChatResponse(
@@ -61,10 +61,10 @@ class AgentLoopOrchestrator:
             content.append({"type": "text", "text": llm_response.text})
         for tool_call in llm_response.tool_calls:
             content.append({
-                "type": "tool_use",
+                "type": "tool_call",
                 "id": tool_call.id,
                 "name": tool_call.name,
-                "input": tool_call.arguments,
+                "arguments": tool_call.arguments,
             })
         return {"role": "assistant", "content": content}
 
@@ -86,14 +86,16 @@ class AgentLoopOrchestrator:
                 result = await mcp_client.call_tool(tool_call.name, tool_call.arguments)
             return {
                 "type": "tool_result",
-                "tool_use_id": tool_call.id,
+                "tool_call_id": tool_call.id,
+                "name": tool_call.name,
                 "content": result,
             }
         except Exception:
             logger.exception("Tool call failed: %s", tool_call.name)
             return {
                 "type": "tool_result",
-                "tool_use_id": tool_call.id,
+                "tool_call_id": tool_call.id,
+                "name": tool_call.name,
                 "content": f"Error executing {tool_call.name}: tool call failed",
                 "is_error": True,
             }
