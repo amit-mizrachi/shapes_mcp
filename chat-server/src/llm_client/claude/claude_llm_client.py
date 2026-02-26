@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 import anthropic
+from llm_client.base_llm_client import BaseLLMClient
 from shared.config import Config
-from llm.base_llm_client import BaseLLMClient
 from shared.modules.llm.llm_response import LLMResponse
 from shared.modules.llm.tool_call import ToolCall
 

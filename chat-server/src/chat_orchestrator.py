@@ -1,12 +1,10 @@
-from __future__ import annotations
-
 import asyncio
 import json
 import logging
 
 from shared.config import Config
 from shared.modules.api.chat_response import ChatResponse
-from llm.base_llm_client import BaseLLMClient
+from llm_client.base_llm_client import BaseLLMClient
 from mcp_client.mcp_client import MCPClient
 from mcp_client.mcp_client_manager import MCPClientManager
 
