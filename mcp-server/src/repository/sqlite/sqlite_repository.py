@@ -8,10 +8,10 @@ from typing import Optional
 import aiosqlite
 
 from shared.config import Config
-from shared.modules.column_info import ColumnInfo
-from shared.modules.filter_condition import FilterCondition
-from shared.modules.query_result import QueryResult
-from shared.modules.table_schema import TableSchema
+from shared.modules.data.column_info import ColumnInfo
+from shared.modules.data.filter_condition import FilterCondition
+from shared.modules.data.query_result import QueryResult
+from shared.modules.data.table_schema import TableSchema
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,7 @@ class SqliteRepository:
         parts: list[str] = []
         params: list = []
         for filter_condition in filter_conditions:
-            self._validate_filter(filter_condition)
+            self._validate_column(filter_condition.column)
             parts.append(self._filter_to_sql_expression(filter_condition))
             if filter_condition.op == "IN":
                 params.extend(filter_condition.value)
@@ -85,9 +85,6 @@ class SqliteRepository:
                 params.append(filter_condition.value)
         where_clause = " WHERE " + " AND ".join(parts)
         return where_clause, params
-
-    def _validate_filter(self, filter_condition: FilterCondition) -> None:
-        self._validate_column(filter_condition.column)
 
     def _filter_to_sql_expression(self, filter_condition: FilterCondition) -> str:
         if filter_condition.op == "LIKE":
@@ -101,7 +98,10 @@ class SqliteRepository:
         if order_by is None:
             return ""
         self._validate_column(order_by)
-        return f' ORDER BY "{order_by}" {order.upper()}'
+        normalized = order.upper()
+        if normalized not in ("ASC", "DESC"):
+            raise ValueError(f"order must be 'asc' or 'desc', got: {order!r}")
+        return f' ORDER BY "{order_by}" {normalized}'
 
     def _validate_aggregation_args(self, operation: str, field: Optional[str], group_by: Optional[str]) -> str:
         sql_operation = operation.upper()
