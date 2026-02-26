@@ -11,7 +11,7 @@ from repository.csv_parser import CSVParser
 from repository.sqlite.sqlite_ingester import SqliteIngester
 from repository.sqlite.sqlite_repository import SqliteRepository
 from shared.modules.data.filter_condition import FilterCondition
-import tools
+import mcp_tools
 
 
 @pytest.fixture()
@@ -104,28 +104,28 @@ class TestMCPPipelineE2E:
 @pytest.mark.e2e
 class TestToolsE2E:
     async def test_get_schema_tool(self, real_ctx):
-        result = json.loads(await tools.get_schema(real_ctx))
+        result = json.loads(await mcp_tools.get_schema(real_ctx))
         assert result["table"] == "sample_data"
         assert len(result["columns"]) == 5
 
     async def test_select_rows_tool(self, real_ctx):
-        result = json.loads(await tools.select_rows(context=real_ctx))
+        result = json.loads(await mcp_tools.select_rows(context=real_ctx))
         assert result["count"] == 5
 
     async def test_select_rows_with_filters(self, real_ctx):
         filters = [{"column": "name", "op": "=", "value": "Alice"}]
-        result = json.loads(await tools.select_rows(filters=filters, context=real_ctx))
+        result = json.loads(await mcp_tools.select_rows(filters=filters, context=real_ctx))
         assert result["count"] == 1
         assert result["data"][0]["name"] == "Alice"
 
     async def test_select_rows_with_fields(self, real_ctx):
-        result = json.loads(await tools.select_rows(fields=["name", "city"], context=real_ctx))
+        result = json.loads(await mcp_tools.select_rows(fields=["name", "city"], context=real_ctx))
         row = result["data"][0]
         assert "name" in row
         assert "city" in row
 
     async def test_aggregate_tool(self, real_ctx):
-        result = json.loads(await tools.aggregate(operation="count", context=real_ctx))
+        result = json.loads(await mcp_tools.aggregate(operation="count", context=real_ctx))
         assert result["data"][0]["result"] == 5
 
     async def test_aggregate_with_group_by(self, real_ctx):
@@ -138,5 +138,5 @@ class TestToolsE2E:
         assert "error" in result
 
     async def test_invalid_aggregate_returns_error(self, real_ctx):
-        result = json.loads(await tools.aggregate(operation="median", field="age", context=real_ctx))
+        result = json.loads(await mcp_tools.aggregate(operation="median", field="age", context=real_ctx))
         assert "error" in result

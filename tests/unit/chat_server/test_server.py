@@ -14,7 +14,7 @@ def app_with_mocks():
     """Import and configure the FastAPI app with mocked dependencies."""
     with patch("server.MCPClientManager") as mock_mgr_cls, \
          patch("server.LLMClientFactory") as mock_factory, \
-         patch("server.AgentLoopOrchestrator") as mock_uc_cls:
+         patch("server.ChatOrchestrator") as mock_uc_cls:
 
         mock_mgr = MagicMock()
         mock_mgr.initialize = AsyncMock()

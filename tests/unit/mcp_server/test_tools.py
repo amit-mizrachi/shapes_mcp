@@ -1,4 +1,4 @@
-"""Tests for mcp-server/src/tools.py — MCP tool handlers + filter parsing."""
+"""Tests for mcp-server/src/mcp_tools.py — MCP tool handlers + filter parsing."""
 
 import json
 from unittest.mock import AsyncMock, MagicMock
@@ -10,7 +10,7 @@ from shared.modules.data.column_info import ColumnInfo
 from shared.modules.data.filter_condition import FilterCondition
 from shared.modules.data.query_result import QueryResult
 from shared.modules.data.table_schema import TableSchema
-import tools
+import mcp_tools
 
 
 def _make_mock_ctx(repository=None):
@@ -69,20 +69,20 @@ class TestParseFilters:
             {"column": "age", "op": ">=", "value": 18},
             {"column": "city", "value": "London"},
         ]
-        result = tools._parse_filters(raw)
+        result = mcp_tools._parse_filters(raw)
         assert len(result) == 2
 
     def test_missing_column_raises(self):
         with pytest.raises((ValueError, ValidationError)):
-            tools._parse_filters([{"op": "=", "value": "x"}])
+            mcp_tools._parse_filters([{"op": "=", "value": "x"}])
 
     def test_non_string_column_raises(self):
         with pytest.raises((ValueError, ValidationError)):
-            tools._parse_filters([{"column": 123}])
+            mcp_tools._parse_filters([{"column": 123}])
 
     def test_invalid_op_raises(self):
         with pytest.raises((ValueError, ValidationError)):
-            tools._parse_filters([{"column": "age", "op": "!="}])
+            mcp_tools._parse_filters([{"column": "age", "op": "!="}])
 
 
 class TestGetSchema:
@@ -104,14 +104,14 @@ class TestGetSchema:
     async def test_no_repository_raises(self):
         ctx = _make_mock_ctx(None)
         with pytest.raises(RuntimeError, match="Repository not initialized"):
-            await tools.get_schema(ctx)
+            await mcp_tools.get_schema(ctx)
 
 
 class TestSelectRows:
     async def test_basic_select(self):
         repo = _make_mock_repository()
         ctx = _make_mock_ctx(repo)
-        result = json.loads(await tools.select_rows(context=ctx))
+        result = json.loads(await mcp_tools.select_rows(context=ctx))
         assert result["count"] == 1
         assert result["data"][0]["name"] == "Alice"
 
@@ -145,13 +145,13 @@ class TestAggregate:
     async def test_basic_count(self):
         repo = _make_mock_repository()
         ctx = _make_mock_ctx(repo)
-        result = json.loads(await tools.aggregate(operation="count", context=ctx))
+        result = json.loads(await mcp_tools.aggregate(operation="count", context=ctx))
         assert result["count"] == 1
 
     async def test_with_group_by(self):
         repo = _make_mock_repository()
         ctx = _make_mock_ctx(repo)
-        await tools.aggregate(operation="count", group_by="city", context=ctx)
+        await mcp_tools.aggregate(operation="count", group_by="city", context=ctx)
         repo.aggregate.assert_called_once()
         assert repo.aggregate.call_args.kwargs["group_by"] == "city"
 

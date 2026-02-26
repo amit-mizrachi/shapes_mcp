@@ -34,14 +34,18 @@ class ClaudeLLMClient(BaseLLMClient):
             role = message["role"]
             if role == "system":
                 system_prompt = message["content"]
-            elif role == "tool":
-                converted_result_tool_message = self._convert_tool_result_message(message)
-                claude_messages.append(converted_result_tool_message)
-            elif role == "assistant" and isinstance(message.get("content"), list):
-                converted_assistant_tool_message = self._convert_assistant_tool_message(message)
-                claude_messages.append(converted_assistant_tool_message)
-            else:
+            elif role == "user":
                 claude_messages.append(message)
+            elif role == "assistant" and isinstance(message.get("content"), list):
+                assistant_message = self._convert_assistant_tool_message(message)
+                claude_messages.append(assistant_message)
+            elif role == "assistant":
+                claude_messages.append(message)
+            elif role == "tool":
+                tool_message = self._convert_tool_result_message(message)
+                claude_messages.append(tool_message)
+            else:
+                raise ValueError(f"Unknown role: {role}")
 
         return system_prompt, claude_messages
 

@@ -31,7 +31,7 @@ class TestMCPClient:
         return session
 
     async def test_context_manager_enter_exit(self, mock_streams, mock_session):
-        with patch("mcp_client.mcp_client.streamable_http_client", return_value=mock_streams), \
+        with patch("mcp_client.mcp_client.streamablehttp_client", return_value=mock_streams), \
              patch("mcp_client.mcp_client.ClientSession", return_value=mock_session):
             async with MCPClient("http://localhost:3001/mcp") as client:
                 assert client._session is not None
@@ -46,7 +46,7 @@ class TestMCPClient:
             return_value=SimpleNamespace(tools=[mock_tool])
         )
 
-        with patch("mcp_client.mcp_client.streamable_http_client", return_value=mock_streams), \
+        with patch("mcp_client.mcp_client.streamablehttp_client", return_value=mock_streams), \
              patch("mcp_client.mcp_client.ClientSession", return_value=mock_session):
             async with MCPClient("http://localhost:3001/mcp") as client:
                 tools = await client.list_tools()
@@ -62,7 +62,7 @@ class TestMCPClient:
             return_value=SimpleNamespace(content=[text_content])
         )
 
-        with patch("mcp_client.mcp_client.streamable_http_client", return_value=mock_streams), \
+        with patch("mcp_client.mcp_client.streamablehttp_client", return_value=mock_streams), \
              patch("mcp_client.mcp_client.ClientSession", return_value=mock_session):
             async with MCPClient("http://localhost:3001/mcp") as client:
                 result = await client.call_tool("select_rows", {"limit": 5})
@@ -76,7 +76,7 @@ class TestMCPClient:
             return_value=SimpleNamespace(content=[content1, content2])
         )
 
-        with patch("mcp_client.mcp_client.streamable_http_client", return_value=mock_streams), \
+        with patch("mcp_client.mcp_client.streamablehttp_client", return_value=mock_streams), \
              patch("mcp_client.mcp_client.ClientSession", return_value=mock_session):
             async with MCPClient("http://localhost:3001/mcp") as client:
                 result = await client.call_tool("test", {})
@@ -89,7 +89,7 @@ class TestMCPClient:
             return_value=SimpleNamespace(content=[content])
         )
 
-        with patch("mcp_client.mcp_client.streamable_http_client", return_value=mock_streams), \
+        with patch("mcp_client.mcp_client.streamablehttp_client", return_value=mock_streams), \
              patch("mcp_client.mcp_client.ClientSession", return_value=mock_session):
             async with MCPClient("http://localhost:3001/mcp") as client:
                 result = await client.call_tool("test", {})
@@ -102,7 +102,7 @@ class TestMCPClient:
             return_value=SimpleNamespace(tools=[])
         )
 
-        with patch("mcp_client.mcp_client.streamable_http_client", return_value=mock_streams), \
+        with patch("mcp_client.mcp_client.streamablehttp_client", return_value=mock_streams), \
              patch("mcp_client.mcp_client.ClientSession", return_value=mock_session):
             async with MCPClient("http://localhost:3001/mcp") as client:
                 tools = await client.list_tools()

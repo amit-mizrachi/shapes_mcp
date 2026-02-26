@@ -7,7 +7,7 @@ class Config:
         "mcp_server.numeric_threshold": 0.8,
 
         # ── Chat Server ──
-        "chat_server.llm_provider":      "claude",
+        "chat_server.llm_provider":      "gemini",
         "chat_server.anthropic_model":   "claude-sonnet-4-20250514",
         "chat_server.max_tokens":        4096,
         "chat_server.gemini_model":      "gemini-2.5-flash",

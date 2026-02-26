@@ -8,7 +8,7 @@ from shared.modules.data.query_result import QueryResult
 
 
 @runtime_checkable
-class DataRepository(Protocol):
+class DataRepositoryProtocol(Protocol):
     async def get_schema(self) -> TableSchema | None: ...
 
     async def select_rows(

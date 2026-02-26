@@ -7,7 +7,7 @@ import uvicorn
 from mcp.server.fastmcp import FastMCP
 from starlette.responses import JSONResponse
 
-import tools
+import mcp_tools
 from repository.sqlite.sqlite_ingester import SqliteIngester
 from repository.sqlite.sqlite_repository import SqliteRepository
 
@@ -52,9 +52,9 @@ mcp_server = FastMCP(
     streamable_http_path=_STREAMABLE_HTTP_PATH,
 )
 
-mcp_server.tool()(tools.get_schema)
-mcp_server.tool()(tools.select_rows)
-mcp_server.tool()(tools.aggregate)
+mcp_server.tool()(mcp_tools.get_schema)
+mcp_server.tool()(mcp_tools.select_rows)
+mcp_server.tool()(mcp_tools.aggregate)
 
 http_app = mcp_server.streamable_http_app()
 

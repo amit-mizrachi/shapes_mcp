@@ -13,14 +13,14 @@ from fastapi.responses import JSONResponse
 from shared.config import Config
 from shared.modules.api.chat_request import ChatRequest
 from shared.modules.api.chat_response import ChatResponse
-from agent_loop_orchestrator import AgentLoopOrchestrator
+from chat_orchestrator import ChatOrchestrator
 from llm_clients.llm_client_factory import LLMClientFactory
 from mcp_client.mcp_client_manager import MCPClientManager
 
 _MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "http://mcp-server:3001/mcp")
 _MCP_MAX_CONCURRENT = 10
 _SEMAPHORE_TIMEOUT = 30.0
-_RETRY_ATTEMPTS = 10
+_RETRY_ATTEMPTS = 3
 _RETRY_SLEEP = 3
 _TIMEOUT_SECONDS = 120
 
@@ -54,7 +54,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     llm_provider = Config.get("chat_server.llm_provider")
     llm_client = LLMClientFactory.create(llm_provider)
 
-    app.state.orchestrator = AgentLoopOrchestrator(
+    app.state.orchestrator = ChatOrchestrator(
         llm_client=llm_client,
         mcp_manager=mcp_manager,
         system_prompt=Config.get("chat_server.system_prompt"),

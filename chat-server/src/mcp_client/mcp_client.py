@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 
 from mcp import ClientSession
-from mcp.client.streamable_http import streamable_http_client
+from mcp.client.streamable_http import streamablehttp_client
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ class MCPClient:
         self._streams = None
 
     async def __aenter__(self) -> MCPClient:
-        self._streams = streamable_http_client(self._url)
+        self._streams = streamablehttp_client(self._url)
         read, write, _ = await self._streams.__aenter__()
         try:
             self._session = ClientSession(read, write)

@@ -12,7 +12,7 @@ from shared.modules.llm.tool_call import ToolCall
 logger = logging.getLogger(__name__)
 
 
-class AgentLoopOrchestrator:
+class ChatOrchestrator:
     def __init__(
         self,
         llm_client: BaseLLMClient,

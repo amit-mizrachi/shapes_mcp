@@ -1,4 +1,4 @@
-"""Tests for chat-server/src/agent_loop_orchestrator.py — agent loop, max iterations, tracing."""
+"""Tests for chat-server/src/chat_orchestrator.py — agent loop, max iterations, tracing."""
 
 from unittest.mock import AsyncMock
 
@@ -8,7 +8,7 @@ from shared.modules.api.chat_request import ChatRequest
 from shared.modules.api.message_item import MessageItem
 from shared.modules.llm.llm_response import LLMResponse
 from shared.modules.llm.tool_call import ToolCall
-from agent_loop_orchestrator import AgentLoopOrchestrator
+from chat_orchestrator import ChatOrchestrator
 
 
 def _request(content: str = "hello") -> ChatRequest:
@@ -26,8 +26,8 @@ def _tool_response(tool_name: str = "get_schema", tool_args: dict = None, text: 
     )
 
 
-def _make_orchestrator(llm_client, mcp_manager, max_iterations: int = 10) -> AgentLoopOrchestrator:
-    return AgentLoopOrchestrator(
+def _make_orchestrator(llm_client, mcp_manager, max_iterations: int = 10) -> ChatOrchestrator:
+    return ChatOrchestrator(
         llm_client=llm_client,
         mcp_manager=mcp_manager,
         system_prompt="You are helpful",

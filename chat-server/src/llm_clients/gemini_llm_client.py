@@ -35,11 +35,16 @@ class GeminiLLMClient(BaseLLMClient):
             if role == "system":
                 system_instruction = message["content"]
             elif role == "user":
-                contents.append(self._convert_user_message(message))
+                user_message = self._convert_user_message(message)
+                contents.append(user_message)
             elif role == "assistant":
-                contents.append(self._convert_assistant_message(message))
+                assistant_message = self._convert_assistant_message(message)
+                contents.append(assistant_message)
             elif role == "tool":
-                contents.append(self._convert_tool_result_message(message))
+                tool_message = self._convert_tool_result_message(message)
+                contents.append(tool_message)
+            else:
+                raise ValueError(f"Unknown role: {role}")
 
         return system_instruction, contents
 

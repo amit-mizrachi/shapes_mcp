@@ -7,7 +7,7 @@ from mcp.server.fastmcp import Context
 
 from shared.config import Config
 from shared.modules.data.filter_condition import FilterCondition
-from repository.data_repository import DataRepository
+from repository.data_repository_protocol import DataRepositoryProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +112,7 @@ async def aggregate(
         return json.dumps({"error": str(e)})
     return json.dumps({"data": query_result.rows, "count": query_result.count})
 
-def _get_repository(context: Context) -> DataRepository:
+def _get_repository(context: Context) -> DataRepositoryProtocol:
     repository = context.request_context.lifespan_context.get("repository")
     if repository is None:
         logger.error("Repository not initialized")

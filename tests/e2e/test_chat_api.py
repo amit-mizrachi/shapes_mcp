@@ -89,7 +89,7 @@ async def e2e_client(real_mcp_pipeline, mock_llm_for_e2e):
 
 def _make_tool_caller(repo):
     """Create a side_effect function that routes tool calls to the real repository."""
-    import tools
+    import mcp_tools
     from unittest.mock import MagicMock
 
     ctx = MagicMock()
@@ -97,11 +97,11 @@ def _make_tool_caller(repo):
 
     async def call_tool(name, arguments):
         if name == "get_schema":
-            return await tools.get_schema(ctx)
+            return await mcp_tools.get_schema(ctx)
         elif name == "select_rows":
-            return await tools.select_rows(**arguments, context=ctx)
+            return await mcp_tools.select_rows(**arguments, context=ctx)
         elif name == "aggregate":
-            return await tools.aggregate(**arguments, context=ctx)
+            return await mcp_tools.aggregate(**arguments, context=ctx)
         return json.dumps({"error": f"Unknown tool: {name}"})
 
     return call_tool
