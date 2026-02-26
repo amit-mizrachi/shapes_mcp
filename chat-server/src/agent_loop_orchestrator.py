@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from llm_client.base_llm_client import BaseLLMClient
+from llm_clients.base_llm_client import BaseLLMClient
 from mcp_client.mcp_client_manager import MCPClientManager
 from shared.modules.api.chat_request import ChatRequest
 from shared.modules.api.chat_response import ChatResponse
@@ -68,11 +68,7 @@ class AgentLoopOrchestrator:
             })
         return {"role": "assistant", "content": content}
 
-    async def _execute_tool_calls(
-        self,
-        tool_calls: list[ToolCall],
-        tool_call_history: list[dict],
-    ) -> list[dict]:
+    async def _execute_tool_calls(self, tool_calls: list[ToolCall], tool_call_history: list[dict]) -> list[dict]:
         tool_results: list[dict] = []
         for tool_call in tool_calls:
             tool_call_history.append({"tool": tool_call.name, "arguments": tool_call.arguments})

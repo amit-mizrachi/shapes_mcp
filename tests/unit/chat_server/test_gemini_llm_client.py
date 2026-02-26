@@ -1,12 +1,11 @@
-"""Tests for chat-server/src/llm_client/gemini/gemini_llm_client.py — tool conversion, message conversion, invoke."""
+"""Tests for chat-server/src/llm_clients/gemini/gemini_llm_client.py — tool conversion, message conversion, invoke."""
 
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from google.genai import types
 
-from llm_client.gemini.gemini_llm_client import GeminiLLMClient
+from llm_clients.gemini_llm_client import GeminiLLMClient
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -34,7 +33,12 @@ def _fc_part(name: str, args: dict, id: str | None = None):
 # ── TestConvertTools ─────────────────────────────────────────────────────────
 
 class TestConvertTools:
-    def test_converts_mcp_to_gemini_format(self):
+    @pytest.fixture()
+    def client(self):
+        with patch("llm_clients.gemini_llm_client.genai"):
+            return GeminiLLMClient(model="gemini-2.5-flash", max_tokens=4096)
+
+    def test_converts_mcp_to_gemini_format(self, client):
         mcp_tools = [
             {
                 "name": "get_schema",
@@ -42,31 +46,36 @@ class TestConvertTools:
                 "inputSchema": {"type": "object", "properties": {}},
             }
         ]
-        result = GeminiLLMClient._convert_tools(mcp_tools)
+        result = client._convert_tools(mcp_tools)
         assert len(result) == 1
         decls = result[0].function_declarations
         assert len(decls) == 1
         assert decls[0].name == "get_schema"
         assert decls[0].description == "Get schema"
 
-    def test_multiple_tools(self):
+    def test_multiple_tools(self, client):
         mcp_tools = [
             {"name": "tool_a", "description": "A", "inputSchema": {}},
             {"name": "tool_b", "description": "B", "inputSchema": {}},
         ]
-        result = GeminiLLMClient._convert_tools(mcp_tools)
+        result = client._convert_tools(mcp_tools)
         assert len(result[0].function_declarations) == 2
 
-    def test_empty_tools(self):
-        result = GeminiLLMClient._convert_tools([])
+    def test_empty_tools(self, client):
+        result = client._convert_tools([])
         assert result[0].function_declarations == []
 
 
 # ── TestConvertMessages ──────────────────────────────────────────────────────
 
 class TestConvertMessages:
-    def test_system_message_extracted(self):
-        system, contents = GeminiLLMClient._convert_messages([
+    @pytest.fixture()
+    def client(self):
+        with patch("llm_clients.gemini_llm_client.genai"):
+            return GeminiLLMClient(model="gemini-2.5-flash", max_tokens=4096)
+
+    def test_system_message_extracted(self, client):
+        system, contents = client._convert_messages([
             {"role": "system", "content": "Be helpful"},
             {"role": "user", "content": "hi"},
         ])
@@ -74,24 +83,24 @@ class TestConvertMessages:
         assert len(contents) == 1
         assert contents[0].role == "user"
 
-    def test_user_message(self):
-        _, contents = GeminiLLMClient._convert_messages([
+    def test_user_message(self, client):
+        _, contents = client._convert_messages([
             {"role": "user", "content": "hello"},
         ])
         assert len(contents) == 1
         assert contents[0].role == "user"
         assert contents[0].parts[0].text == "hello"
 
-    def test_assistant_text_message(self):
-        _, contents = GeminiLLMClient._convert_messages([
+    def test_assistant_text_message(self, client):
+        _, contents = client._convert_messages([
             {"role": "assistant", "content": "I can help"},
         ])
         assert len(contents) == 1
         assert contents[0].role == "model"
         assert contents[0].parts[0].text == "I can help"
 
-    def test_assistant_tool_call_message(self):
-        _, contents = GeminiLLMClient._convert_messages([
+    def test_assistant_tool_call_message(self, client):
+        _, contents = client._convert_messages([
             {"role": "assistant", "content": [
                 {"type": "text", "text": "Let me check"},
                 {"type": "tool_call", "id": "tc_1", "name": "get_schema", "arguments": {"x": 1}},
@@ -106,8 +115,8 @@ class TestConvertMessages:
         assert fc.args == {"x": 1}
         assert fc.id == "tc_1"
 
-    def test_tool_result_message(self):
-        _, contents = GeminiLLMClient._convert_messages([
+    def test_tool_result_message(self, client):
+        _, contents = client._convert_messages([
             {"role": "tool", "content": [
                 {"type": "tool_result", "tool_call_id": "tc_1", "name": "get_schema", "content": "ok"},
             ]},
@@ -119,8 +128,8 @@ class TestConvertMessages:
         assert fr.id == "tc_1"
         assert fr.response == {"result": "ok"}
 
-    def test_no_system_returns_none(self):
-        system, _ = GeminiLLMClient._convert_messages([
+    def test_no_system_returns_none(self, client):
+        system, _ = client._convert_messages([
             {"role": "user", "content": "hi"},
         ])
         assert system is None
@@ -131,7 +140,7 @@ class TestConvertMessages:
 class TestInvoke:
     @pytest.fixture()
     def mock_genai(self):
-        with patch("llm_client.gemini.gemini_llm_client.genai") as mock_mod:
+        with patch("llm_clients.gemini_llm_client.genai") as mock_mod:
             mock_client = MagicMock()
             mock_mod.Client.return_value = mock_client
             mock_client.aio.models.generate_content = AsyncMock()

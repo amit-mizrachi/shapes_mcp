@@ -1,20 +1,19 @@
-"""Tests for chat-server/src/llm_client/claude_llm_client.py — tool conversion, response parsing."""
+"""Tests for chat-server/src/llm_clients/claude_llm_client.py — tool conversion, response parsing."""
 
-import json
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from llm_client.claude.claude_llm_client import ClaudeLLMClient
+from llm_clients.claude_llm_client import ClaudeLLMClient
 
 
 def _text_block(text: str):
     return SimpleNamespace(type="text", text=text)
 
 
-def _tool_use_block(id: str, name: str, input: dict):
-    return SimpleNamespace(type="tool_use", id=id, name=name, input=input)
+def _tool_use_block(block_id: str, name: str, tool_input: dict):
+    return SimpleNamespace(type="tool_use", id=block_id, name=name, input=tool_input)
 
 
 class TestConvertTools:
@@ -102,7 +101,7 @@ class TestConvertMessages:
 class TestInvoke:
     @pytest.fixture()
     def mock_anthropic(self):
-        with patch("llm_client.claude.claude_llm_client.anthropic") as mock_mod:
+        with patch("llm_clients.claude_llm_client.anthropic") as mock_mod:
             mock_client = AsyncMock()
             mock_mod.AsyncAnthropic.return_value = mock_client
             yield mock_client

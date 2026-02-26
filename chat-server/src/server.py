@@ -13,8 +13,8 @@ from shared.config import Config
 from shared.modules.api.chat_request import ChatRequest
 from shared.modules.api.chat_response import ChatResponse
 from agent_loop_orchestrator import AgentLoopOrchestrator
-from llm_client.claude.claude_llm_client import ClaudeLLMClient
-from llm_client.gemini.gemini_llm_client import GeminiLLMClient
+from llm_clients.claude_llm_client import ClaudeLLMClient
+from llm_clients.gemini_llm_client import GeminiLLMClient
 from mcp_client.mcp_client_manager import MCPClientManager
 
 logging.basicConfig(

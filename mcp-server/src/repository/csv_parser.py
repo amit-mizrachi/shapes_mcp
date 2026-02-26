@@ -21,7 +21,7 @@ class CSVParser:
         raw_columns, rows = CSVParser._read_csv(csv_path)
         sanitized_columns = CSVParser._sanitize_column_names(raw_columns)
         table_name = CSVParser.path_to_table_name(csv_path)
-        columns = CSVParser._detect_columns(raw_columns, sanitized_columns, rows)
+        columns = CSVParser._detect_column_types(raw_columns, sanitized_columns, rows)
         sanitized_rows = CSVParser._rekey_rows(raw_columns, sanitized_columns, rows)
 
         return ParsedCSV(
@@ -68,12 +68,11 @@ class CSVParser:
         return CSVParser._sanitize_identifier(basename) or "data"
 
     @staticmethod
-    def _detect_columns(
+    def _detect_column_types(
         raw_columns: list[str],
         sanitized_columns: list[str],
         rows: list[dict],
     ) -> list[ColumnInfo]:
-        """Detect column types by sampling row values."""
         columns: list[ColumnInfo] = []
         for original, sanitized in zip(raw_columns, sanitized_columns):
             values = [row[original] for row in rows]
@@ -83,7 +82,6 @@ class CSVParser:
 
     @staticmethod
     def detect_column_type(values: list[str]) -> str:
-        """Return 'numeric' if >80% of non-empty values parse as float, else 'text'."""
         numeric_count = 0
         total = 0
         for raw_value in values:
@@ -102,6 +100,5 @@ class CSVParser:
 
     @staticmethod
     def _rekey_rows(raw_columns: list[str], sanitized_columns: list[str], rows: list[dict]) -> list[dict]:
-        """Re-key rows from original headers to sanitized column names."""
         column_name_map = dict(zip(raw_columns, sanitized_columns))
         return [{column_name_map[key]: val for key, val in row.items()} for row in rows]

@@ -1,0 +1,131 @@
+from __future__ import annotations
+
+import logging
+from uuid import uuid4
+
+from google import genai
+from google.genai import types
+
+from llm_clients.base_llm_client import BaseLLMClient
+from shared.modules.llm.llm_response import LLMResponse
+from shared.modules.llm.tool_call import ToolCall
+
+logger = logging.getLogger(__name__)
+
+
+class GeminiLLMClient(BaseLLMClient):
+    def __init__(self, model: str, max_tokens: int):
+        self._client = genai.Client()
+        self._model = model
+        self._max_tokens = max_tokens
+
+    async def invoke(self, messages: list[dict], tools: list[dict]) -> LLMResponse:
+        """Send messages to Gemini and return a provider-agnostic LLMResponse."""
+        system_instruction, contents = self._convert_messages(messages)
+        response = await self._send_request(system_instruction, contents, tools)
+        return self._parse_response(response)
+
+    def _convert_messages(self, messages: list[dict]) -> tuple[str | None, list[types.Content]]:
+        """Separate the system instruction and translate messages to Gemini's format."""
+        system_instruction = None
+        contents: list[types.Content] = []
+
+        for message in messages:
+            role = message["role"]
+            if role == "system":
+                system_instruction = message["content"]
+            elif role == "user":
+                contents.append(self._convert_user_message(message))
+            elif role == "assistant":
+                contents.append(self._convert_assistant_message(message))
+            elif role == "tool":
+                contents.append(self._convert_tool_result_message(message))
+
+        return system_instruction, contents
+
+    def _convert_user_message(self, message: dict) -> types.Content:
+        """Convert a user message to Gemini's Content format."""
+        return types.Content(
+            role="user",
+            parts=[types.Part(text=message["content"])],
+        )
+
+    def _convert_assistant_message(self, message: dict) -> types.Content:
+        """Convert an assistant message (text or tool calls) to Gemini's Content format."""
+        parts: list[types.Part] = []
+        content = message.get("content", "")
+
+        if isinstance(content, str):
+            parts.append(types.Part(text=content))
+        else:
+            for block in content:
+                if block.get("type") == "text":
+                    parts.append(types.Part(text=block["text"]))
+                elif block.get("type") == "tool_call":
+                    parts.append(types.Part(function_call=types.FunctionCall(
+                        id=block["id"],
+                        name=block["name"],
+                        args=block["arguments"],
+                    )))
+
+        return types.Content(role="model", parts=parts)
+
+    def _convert_tool_result_message(self, message: dict) -> types.Content:
+        """Convert a tool-result message to Gemini's FunctionResponse format."""
+        parts = []
+        for result in message["content"]:
+            parts.append(types.Part(function_response=types.FunctionResponse(
+                id=result.get("tool_call_id"),
+                name=result.get("name", ""),
+                response={"result": result.get("content", "")},
+            )))
+        return types.Content(role="user", parts=parts)
+
+    def _convert_tools(self, mcp_tools: list[dict]) -> list[types.Tool]:
+        """Convert MCP tool schemas to Gemini's tool format."""
+        function_declarations = [
+            types.FunctionDeclaration(
+                name=tool["name"],
+                description=tool.get("description", ""),
+                parameters=tool.get("inputSchema"),
+            )
+            for tool in mcp_tools
+        ]
+        return [types.Tool(function_declarations=function_declarations)]
+
+    async def _send_request(self, system_instruction, contents, tools):
+        """Build config and call the Gemini content generation API."""
+        config = types.GenerateContentConfig(max_output_tokens=self._max_tokens)
+        if system_instruction:
+            config.system_instruction = system_instruction
+        if tools:
+            config.tools = self._convert_tools(tools)
+
+        return await self._client.aio.models.generate_content(
+            model=self._model, contents=contents, config=config,
+        )
+
+    def _parse_response(self, response) -> LLMResponse:
+        """Extract text and tool calls from Gemini's response candidates."""
+        if not response.candidates:
+            raise RuntimeError(
+                "Gemini returned no candidates — response may have been blocked. "
+                f"Prompt feedback: {response.prompt_feedback}"
+            )
+
+        text_segments: list[str] = []
+        tool_calls: list[ToolCall] = []
+
+        for part in response.candidates[0].content.parts:
+            if part.text:
+                text_segments.append(part.text)
+            elif part.function_call:
+                function_call = part.function_call
+                tool_call_id = function_call.id or f"gemini_{uuid4().hex[:12]}"
+                tool_calls.append(ToolCall(
+                    id=tool_call_id,
+                    name=function_call.name,
+                    arguments=dict(function_call.args) if function_call.args else {},
+                ))
+
+        return LLMResponse(text="\n".join(text_segments), tool_calls=tool_calls)
