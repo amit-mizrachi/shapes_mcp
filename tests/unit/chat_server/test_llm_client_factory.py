@@ -1,4 +1,4 @@
-"""Tests for chat-server/src/llm_clients/llm_client_factory.py — provider registry + factory."""
+"""Tests for chat-server/src/llm_clients/llm_client_factory.py — LLMClientFactory."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import pytest
 
 from llm_clients.claude_llm_client import ClaudeLLMClient
 from llm_clients.gemini_llm_client import GeminiLLMClient
-from llm_clients.llm_client_factory import create_llm_client
+from llm_clients.llm_client_factory import LLMClientFactory
 
 
 class TestCreateLLMClient:
@@ -19,7 +19,7 @@ class TestCreateLLMClient:
             "chat_server.max_tokens": 4096,
         }[key]
 
-        client = create_llm_client("claude")
+        client = LLMClientFactory.create("claude")
 
         assert isinstance(client, ClaudeLLMClient)
         assert client._model == "claude-sonnet-4-20250514"
@@ -33,7 +33,7 @@ class TestCreateLLMClient:
             "chat_server.gemini_max_tokens": 8192,
         }[key]
 
-        client = create_llm_client("gemini")
+        client = LLMClientFactory.create("gemini")
 
         assert isinstance(client, GeminiLLMClient)
         assert client._model == "gemini-2.5-flash"
@@ -41,4 +41,4 @@ class TestCreateLLMClient:
 
     def test_unknown_provider_raises(self):
         with pytest.raises(ValueError, match="Unknown LLM provider: openai"):
-            create_llm_client("openai")
+            LLMClientFactory.create("openai")
