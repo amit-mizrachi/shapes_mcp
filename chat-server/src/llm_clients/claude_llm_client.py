@@ -5,14 +5,14 @@ import logging
 
 import anthropic
 
-from llm_clients.base_llm_client import BaseLLMClient
+from llm_clients.llm_client_interface import LLMClientInterface
 from shared.modules.llm.llm_response import LLMResponse
 from shared.modules.llm.tool_call import ToolCall
 
 logger = logging.getLogger(__name__)
 
 
-class ClaudeLLMClient(BaseLLMClient):
+class ClaudeLLMClient(LLMClientInterface):
     def __init__(self, model: str, max_tokens: int):
         self._client = anthropic.AsyncAnthropic()
         self._model = model

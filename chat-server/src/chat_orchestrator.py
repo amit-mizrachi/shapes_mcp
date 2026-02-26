@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from llm_clients.base_llm_client import BaseLLMClient
+from llm_clients.llm_client_interface import LLMClientInterface
 from mcp_client.mcp_client_manager import MCPClientManager
 from shared.modules.api.chat_request import ChatRequest
 from shared.modules.api.chat_response import ChatResponse
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class ChatOrchestrator:
     def __init__(
         self,
-        llm_client: BaseLLMClient,
+        llm_client: LLMClientInterface,
         mcp_manager: MCPClientManager,
         system_prompt: str,
         max_iterations: int,

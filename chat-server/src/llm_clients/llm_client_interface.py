@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from shared.modules.llm.llm_response import LLMResponse
 
 
-class BaseLLMClient(ABC):
+class LLMClientInterface(ABC):
     @abstractmethod
     async def invoke(
         self,
