@@ -1,8 +1,7 @@
 export type Role = "user" | "assistant";
 
 export interface ToolCall {
-  id: string;
-  name: string;
+  tool: string;
   arguments: Record<string, unknown>;
 }
 
