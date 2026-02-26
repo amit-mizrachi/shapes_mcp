@@ -68,9 +68,9 @@ async def e2e_client(real_mcp_pipeline, mock_llm_for_e2e):
 
     mock_manager.client = _client
 
-    with patch("main.MCPClientManager") as mock_mgr_cls, \
-         patch("main.ClaudeLLMClient") as mock_llm_cls, \
-         patch("main.ChatOrchestrator") as mock_orch_cls:
+    with patch("server.MCPClientManager") as mock_mgr_cls, \
+         patch("server.ClaudeLLMClient") as mock_llm_cls, \
+         patch("server.ChatOrchestrator") as mock_orch_cls:
 
         mock_mgr_cls.return_value = MagicMock(initialize=AsyncMock())
         mock_llm_cls.return_value = mock_llm_for_e2e
@@ -78,11 +78,11 @@ async def e2e_client(real_mcp_pipeline, mock_llm_for_e2e):
         from chat_orchestrator import ChatOrchestrator
         real_orch = ChatOrchestrator(mock_llm_for_e2e, mock_manager)
 
-        import main
-        main.mcp_manager = mock_manager
-        main.orchestrator = real_orch
+        import server
+        server.mcp_manager = mock_manager
+        server.orchestrator = real_orch
 
-        transport = ASGITransport(app=main.app)
+        transport = ASGITransport(app=server.app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             yield ac
 

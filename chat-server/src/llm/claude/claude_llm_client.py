@@ -3,12 +3,12 @@ from __future__ import annotations
 import json
 import anthropic
 from shared.config import Config
-from llm.llm_client import LLMClient
+from llm.base_llm_client import BaseLLMClient
 from shared.modules.llm.llm_response import LLMResponse
 from shared.modules.llm.tool_call import ToolCall
 
 
-class ClaudeLLMClient(LLMClient):
+class ClaudeLLMClient(BaseLLMClient):
     def __init__(self, model: str):
         self._client = anthropic.AsyncAnthropic()
         self._model = model

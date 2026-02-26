@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from llm.claude_llm_client import ClaudeLLMClient
+from llm.claude.claude_llm_client import ClaudeLLMClient
 
 
 def _text_block(text: str):
@@ -47,7 +47,7 @@ class TestConvertTools:
 class TestInvoke:
     @pytest.fixture()
     def mock_anthropic(self):
-        with patch("llm.claude_llm_client.anthropic") as mock_mod:
+        with patch("llm.claude.claude_llm_client.anthropic") as mock_mod:
             mock_client = AsyncMock()
             mock_mod.AsyncAnthropic.return_value = mock_client
             yield mock_client

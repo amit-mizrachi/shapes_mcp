@@ -1,4 +1,4 @@
-"""Tests for chat-server/src/main.py — FastAPI endpoints: /health, /chat, error codes."""
+"""Tests for chat-server/src/server.py — FastAPI endpoints: /health, /chat, error codes."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -11,9 +11,9 @@ from shared.modules.api.chat_response import ChatResponse
 @pytest.fixture()
 def app_with_mocks():
     """Import and configure the FastAPI app with mocked dependencies."""
-    with patch("main.MCPClientManager") as mock_mgr_cls, \
-         patch("main.ClaudeLLMClient") as mock_llm_cls, \
-         patch("main.ChatOrchestrator") as mock_orch_cls:
+    with patch("server.MCPClientManager") as mock_mgr_cls, \
+         patch("server.ClaudeLLMClient") as mock_llm_cls, \
+         patch("server.ChatOrchestrator") as mock_orch_cls:
 
         mock_mgr = MagicMock()
         mock_mgr.initialize = AsyncMock()
@@ -26,11 +26,11 @@ def app_with_mocks():
         mock_orch.chat = AsyncMock(return_value=ChatResponse(answer="Test reply"))
         mock_orch_cls.return_value = mock_orch
 
-        import main
-        main.mcp_manager = mock_mgr
-        main.orchestrator = mock_orch
+        import server
+        server.mcp_manager = mock_mgr
+        server.orchestrator = mock_orch
 
-        yield main.app, mock_orch
+        yield server.app, mock_orch
 
 
 @pytest.fixture()

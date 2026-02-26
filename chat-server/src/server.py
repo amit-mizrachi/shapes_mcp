@@ -11,8 +11,8 @@ from shared.config import Config
 from chat_orchestrator import ChatOrchestrator
 from shared.modules.api.chat_request import ChatRequest
 from shared.modules.api.chat_response import ChatResponse
-from mcp_layer.mcp_client_manager import MCPClientManager
-from llm.claude_llm_client import ClaudeLLMClient
+from mcp_client.mcp_client_manager import MCPClientManager
+from llm.claude.claude_llm_client import ClaudeLLMClient
 
 logging.basicConfig(level=Config.get("shared.log_level"), format=Config.get("shared.log_format"))
 logger = logging.getLogger(__name__)

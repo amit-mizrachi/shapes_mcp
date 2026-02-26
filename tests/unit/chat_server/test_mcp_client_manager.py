@@ -1,11 +1,11 @@
-"""Tests for chat-server/src/mcp_layer/mcp_client_manager.py — init, tool cache, semaphore."""
+"""Tests for chat-server/src/mcp_client/mcp_client_manager.py — init, tool cache, semaphore."""
 
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from mcp_layer.mcp_client_manager import MCPClientManager
+from mcp_client.mcp_client_manager import MCPClientManager
 
 
 class TestMCPClientManager:
@@ -20,7 +20,7 @@ class TestMCPClientManager:
         ])
         mock_client.call_tool = AsyncMock(return_value="ok")
 
-        with patch("mcp_layer.mcp_client_manager.MCPClient", return_value=mock_client) as mock_cls:
+        with patch("mcp_client.mcp_client_manager.MCPClient", return_value=mock_client) as mock_cls:
             yield mock_cls, mock_client
 
     async def test_initialize_caches_tools(self, mock_mcp_client_class):
@@ -60,7 +60,7 @@ class TestMCPClientManager:
 
         # Second client should raise ConnectionError due to semaphore timeout
         # We patch the timeout to be very short for the test
-        with patch("mcp_layer.mcp_client_manager.Config") as mock_config:
+        with patch("mcp_client.mcp_client_manager.Config") as mock_config:
             mock_config.get = MagicMock(return_value=0.1)  # 100ms timeout
             with pytest.raises(ConnectionError, match="busy"):
                 async with manager.client():

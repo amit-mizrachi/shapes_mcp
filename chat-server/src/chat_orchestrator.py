@@ -6,15 +6,15 @@ import logging
 
 from shared.config import Config
 from shared.modules.api.chat_response import ChatResponse
-from llm.llm_client import LLMClient
-from mcp_layer.mcp_client import MCPClient
-from mcp_layer.mcp_client_manager import MCPClientManager
+from llm.base_llm_client import BaseLLMClient
+from mcp_client.mcp_client import MCPClient
+from mcp_client.mcp_client_manager import MCPClientManager
 
 logger = logging.getLogger(__name__)
 
 
 class ChatOrchestrator:
-    def __init__(self, llm_client: LLMClient, mcp: MCPClientManager):
+    def __init__(self, llm_client: BaseLLMClient, mcp: MCPClientManager):
         self._llm = llm_client
         self._mcp = mcp
 
