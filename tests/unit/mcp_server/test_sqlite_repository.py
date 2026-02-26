@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from shared.modules.data.column_info import ColumnInfo
 from shared.modules.data.filter_condition import FilterCondition
+from repository.csv_parser import CSVParser
 from repository.sqlite.sqlite_repository import SqliteRepository
 from repository.sqlite.sqlite_ingester import SqliteIngester
 
@@ -15,7 +16,7 @@ from repository.sqlite.sqlite_ingester import SqliteIngester
 def repo_with_data(test_db, sample_csv_path):
     """Ingest sample data and return a SqliteRepository."""
     ingester = SqliteIngester(test_db)
-    result = ingester.ingest(str(sample_csv_path))
+    result = ingester.ingest(CSVParser.parse(str(sample_csv_path)))
     repo = SqliteRepository(test_db, result.table_name, result.columns)
     return repo
 

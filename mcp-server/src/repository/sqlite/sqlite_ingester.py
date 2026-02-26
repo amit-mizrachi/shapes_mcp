@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import sqlite3
 
-from repository.csv_parser import CSVParser
 from shared.modules.data.parsed_csv import ParsedCSV
 from shared.modules.data.table_schema import TableSchema
 
@@ -11,9 +10,7 @@ class SqliteIngester:
     def __init__(self, db_uri: str) -> None:
         self._db_uri = db_uri
 
-    def ingest(self, csv_path: str) -> TableSchema:
-        parsed_csv = CSVParser.parse(csv_path)
-
+    def ingest(self, parsed_csv: ParsedCSV) -> TableSchema:
         connection = sqlite3.connect(self._db_uri)
         try:
             self._create_table(connection, parsed_csv)
@@ -42,10 +39,14 @@ class SqliteIngester:
             cursor.execute(f'INSERT INTO "{parsed_csv.table_name}" VALUES ({placeholders})', values)
 
     @staticmethod
-    def _to_sql_value(raw_value: str, detected_type: str) -> float | None | str:
+    def _to_sql_value(raw_value, detected_type: str) -> float | None | str:
+        if raw_value is None:
+            return None
         if detected_type != "numeric":
-            return raw_value
-        stripped = raw_value.strip()
+            return str(raw_value)
+        if isinstance(raw_value, (int, float)):
+            return float(raw_value)
+        stripped = str(raw_value).strip()
         if not stripped:
             return None
         try:

@@ -9,6 +9,7 @@ from httpx import ASGITransport, AsyncClient
 
 from shared.modules.llm.llm_response import LLMResponse
 from shared.modules.llm.tool_call import ToolCall
+from repository.csv_parser import CSVParser
 from repository.sqlite.sqlite_ingester import SqliteIngester
 from repository.sqlite.sqlite_repository import SqliteRepository
 
@@ -19,7 +20,7 @@ def real_mcp_pipeline(sample_csv_path, tmp_path):
     db_path = str(tmp_path / "e2e_chat.db")
 
     ingester = SqliteIngester(db_path)
-    result = ingester.ingest(str(sample_csv_path))
+    result = ingester.ingest(CSVParser.parse(str(sample_csv_path)))
     repo = SqliteRepository(db_path, result.table_name, result.columns)
 
     yield repo, result

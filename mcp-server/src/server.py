@@ -7,6 +7,8 @@ from mcp.server.fastmcp import FastMCP
 from starlette.responses import JSONResponse
 
 import mcp_tools
+from enrichment.default_rules import create_default_enricher
+from repository.csv_parser import CSVParser
 from repository.sqlite.sqlite_ingester import SqliteIngester
 from repository.sqlite.sqlite_repository import SqliteRepository
 from shared.config import Config
@@ -26,12 +28,18 @@ async def server_lifespan(server: FastMCP):
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        logger.info("Initializing database ingestor")
-        ingester = SqliteIngester(db_path_str)
-
-        logger.info("Ingesting CSV data to database")
         csv_file_path = Config.get("mcp_server.csv_file_path")
-        ingest_result = ingester.ingest(csv_file_path)
+
+        logger.info("Parsing CSV data")
+        parsed_csv = CSVParser.parse(csv_file_path)
+
+        logger.info("Enriching parsed data")
+        enricher = create_default_enricher()
+        enriched_csv = enricher.enrich(parsed_csv)
+
+        logger.info("Ingesting enriched data to database")
+        ingester = SqliteIngester(db_path_str)
+        ingest_result = ingester.ingest(enriched_csv)
 
         logger.info("Initializing SQL Repository")
         repository = SqliteRepository(db_path_str, ingest_result.table_name, ingest_result.columns)

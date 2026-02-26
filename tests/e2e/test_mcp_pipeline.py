@@ -18,7 +18,7 @@ def real_pipeline(sample_csv_path, tmp_path):
     db_path = str(tmp_path / "e2e.db")
 
     ingester = SqliteIngester(db_path)
-    result = ingester.ingest(str(sample_csv_path))
+    result = ingester.ingest(CSVParser.parse(str(sample_csv_path)))
     repo = SqliteRepository(db_path, result.table_name, result.columns)
 
     yield repo, result
