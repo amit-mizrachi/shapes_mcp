@@ -222,3 +222,117 @@ class TestInvoke:
             tools=[],
         )
         assert result.text == "Hello\nWorld"
+
+
+# ── TestSanitizeSchema ───────────────────────────────────────────────────
+
+class TestSanitizeSchema:
+    @pytest.fixture()
+    def client(self):
+        with patch("llm_clients.gemini_llm_client.genai"):
+            return GeminiLLMClient(model="gemini-2.5-flash", max_tokens=4096)
+
+    def test_strips_additional_properties_from_nested(self, client):
+        schema = {
+            "type": "object",
+            "properties": {
+                "filters": {
+                    "anyOf": [
+                        {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {"column": {"type": "string"}},
+                                "additionalProperties": False,
+                            },
+                        },
+                        {"type": "null"},
+                    ],
+                }
+            },
+            "additionalProperties": False,
+        }
+        result = client._sanitize_schema(schema)
+        assert "additionalProperties" not in result
+        items = result["properties"]["filters"]["anyOf"][0]["items"]
+        assert "additionalProperties" not in items
+
+    def test_resolves_refs_and_defs(self, client):
+        schema = {
+            "type": "object",
+            "properties": {
+                "filters": {
+                    "type": "array",
+                    "items": {"$ref": "#/$defs/FilterCondition"},
+                }
+            },
+            "$defs": {
+                "FilterCondition": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "op": {"type": "string"},
+                    },
+                }
+            },
+        }
+        result = client._sanitize_schema(schema)
+        assert "$defs" not in result
+        items = result["properties"]["filters"]["items"]
+        assert "$ref" not in items
+        assert items["type"] == "object"
+        assert "column" in items["properties"]
+
+    def test_clean_schema_passes_through(self, client):
+        schema = {
+            "type": "object",
+            "properties": {"name": {"type": "string"}},
+        }
+        result = client._sanitize_schema(schema)
+        assert result == schema
+
+    def test_none_schema_returns_none(self, client):
+        assert client._sanitize_schema(None) is None
+
+    def test_empty_schema_returns_empty(self, client):
+        assert client._sanitize_schema({}) == {}
+
+    def test_convert_tools_with_problematic_schema(self, client):
+        """Integration: _convert_tools doesn't raise with $ref/$defs/additionalProperties."""
+        mcp_tools = [
+            {
+                "name": "select_rows",
+                "description": "Select rows",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "filters": {
+                            "anyOf": [
+                                {
+                                    "type": "array",
+                                    "items": {"$ref": "#/$defs/FilterCondition"},
+                                },
+                                {"type": "null"},
+                            ],
+                        }
+                    },
+                    "$defs": {
+                        "FilterCondition": {
+                            "type": "object",
+                            "properties": {
+                                "column": {"type": "string"},
+                                "op": {"type": "string"},
+                            },
+                            "additionalProperties": False,
+                        }
+                    },
+                    "additionalProperties": False,
+                },
+            }
+        ]
+        result = client._convert_tools(mcp_tools)
+        decl = result[0].function_declarations[0]
+        assert decl.name == "select_rows"
+        params = decl.parameters
+        assert "$defs" not in params
+        assert "additionalProperties" not in params

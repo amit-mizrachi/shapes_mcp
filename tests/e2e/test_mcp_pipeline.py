@@ -113,7 +113,7 @@ class TestToolsE2E:
         assert result["count"] == 5
 
     async def test_select_rows_with_filters(self, real_ctx):
-        filters = [{"column": "name", "op": "=", "value": "Alice"}]
+        filters = [FilterCondition(column="name", op="=", value="Alice")]
         result = json.loads(await mcp_tools.select_rows(filters=filters, context=real_ctx))
         assert result["count"] == 1
         assert result["data"][0]["name"] == "Alice"
@@ -129,12 +129,12 @@ class TestToolsE2E:
         assert result["data"][0]["result"] == 5
 
     async def test_aggregate_with_group_by(self, real_ctx):
-        result = json.loads(await tools.aggregate(operation="count", group_by="active", context=real_ctx))
+        result = json.loads(await mcp_tools.aggregate(operation="count", group_by="active", context=real_ctx))
         assert result["count"] >= 2
 
     async def test_invalid_filter_returns_error(self, real_ctx):
-        filters = [{"column": "bad_col", "op": "=", "value": "x"}]
-        result = json.loads(await tools.select_rows(filters=filters, context=real_ctx))
+        filters = [FilterCondition(column="bad_col", op="=", value="x")]
+        result = json.loads(await mcp_tools.select_rows(filters=filters, context=real_ctx))
         assert "error" in result
 
     async def test_invalid_aggregate_returns_error(self, real_ctx):

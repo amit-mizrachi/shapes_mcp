@@ -4,7 +4,6 @@ import json
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from pydantic import ValidationError
 
 from shared.modules.data.column_info import ColumnInfo
 from shared.modules.data.filter_condition import FilterCondition
@@ -45,51 +44,33 @@ def _make_mock_repository():
 
 class TestParseFilters:
     def test_none_input(self):
-        assert tools._parse_filters(None) is None
+        assert mcp_tools._parse_filters(None) is None
 
     def test_empty_list(self):
-        assert tools._parse_filters([]) is None
+        assert mcp_tools._parse_filters([]) is None
 
     def test_valid_filter(self):
-        raw = [{"column": "age", "op": ">", "value": 30}]
-        result = tools._parse_filters(raw)
+        filters = [FilterCondition(column="age", op=">", value=30)]
+        result = mcp_tools._parse_filters(filters)
         assert len(result) == 1
         assert result[0].column == "age"
         assert result[0].op == ">"
         assert result[0].value == 30
 
-    def test_default_op_and_value(self):
-        raw = [{"column": "name"}]
-        result = tools._parse_filters(raw)
-        assert result[0].op == "="
-        assert result[0].value == ""
-
     def test_multiple_filters(self):
-        raw = [
-            {"column": "age", "op": ">=", "value": 18},
-            {"column": "city", "value": "London"},
+        filters = [
+            FilterCondition(column="age", op=">=", value=18),
+            FilterCondition(column="city", value="London"),
         ]
-        result = mcp_tools._parse_filters(raw)
+        result = mcp_tools._parse_filters(filters)
         assert len(result) == 2
-
-    def test_missing_column_raises(self):
-        with pytest.raises((ValueError, ValidationError)):
-            mcp_tools._parse_filters([{"op": "=", "value": "x"}])
-
-    def test_non_string_column_raises(self):
-        with pytest.raises((ValueError, ValidationError)):
-            mcp_tools._parse_filters([{"column": 123}])
-
-    def test_invalid_op_raises(self):
-        with pytest.raises((ValueError, ValidationError)):
-            mcp_tools._parse_filters([{"column": "age", "op": "!="}])
 
 
 class TestGetSchema:
     async def test_returns_schema_json(self):
         repo = _make_mock_repository()
         ctx = _make_mock_ctx(repo)
-        result = json.loads(await tools.get_schema(ctx))
+        result = json.loads(await mcp_tools.get_schema(ctx))
         assert result["table"] == "test_table"
         assert len(result["columns"]) == 2
         assert result["columns"][0]["name"] == "name"
@@ -98,7 +79,7 @@ class TestGetSchema:
         repo = AsyncMock()
         repo.get_schema = AsyncMock(return_value=None)
         ctx = _make_mock_ctx(repo)
-        result = json.loads(await tools.get_schema(ctx))
+        result = json.loads(await mcp_tools.get_schema(ctx))
         assert "error" in result
 
     async def test_no_repository_raises(self):
@@ -118,8 +99,8 @@ class TestSelectRows:
     async def test_with_filters(self):
         repo = _make_mock_repository()
         ctx = _make_mock_ctx(repo)
-        raw_filters = [{"column": "age", "op": ">", "value": 25}]
-        await tools.select_rows(filters=raw_filters, context=ctx)
+        filters = [FilterCondition(column="age", op=">", value=25)]
+        await mcp_tools.select_rows(filters=filters, context=ctx)
         repo.select_rows.assert_called_once()
         call_filters = repo.select_rows.call_args.kwargs["filters"]
         assert call_filters[0].column == "age"
@@ -127,18 +108,11 @@ class TestSelectRows:
     async def test_with_fields_and_limit(self):
         repo = _make_mock_repository()
         ctx = _make_mock_ctx(repo)
-        await tools.select_rows(fields=["name"], limit=5, context=ctx)
+        await mcp_tools.select_rows(fields=["name"], limit=5, context=ctx)
         repo.select_rows.assert_called_once_with(
             filters=None, fields=["name"], limit=5,
             order_by=None, order="asc", distinct=False,
         )
-
-    async def test_invalid_filter_returns_error(self):
-        repo = _make_mock_repository()
-        ctx = _make_mock_ctx(repo)
-        raw_filters = [{"column": "age", "op": "INVALID"}]
-        result = json.loads(await tools.select_rows(filters=raw_filters, context=ctx))
-        assert "error" in result
 
 
 class TestAggregate:
@@ -158,8 +132,8 @@ class TestAggregate:
     async def test_with_filters(self):
         repo = _make_mock_repository()
         ctx = _make_mock_ctx(repo)
-        raw_filters = [{"column": "age", "op": ">=", "value": 18}]
-        await tools.aggregate(operation="sum", field="score", filters=raw_filters, context=ctx)
+        filters = [FilterCondition(column="age", op=">=", value=18)]
+        await mcp_tools.aggregate(operation="sum", field="score", filters=filters, context=ctx)
         call_filters = repo.aggregate.call_args.kwargs["filters"]
         assert call_filters[0].op == ">="
 
@@ -167,5 +141,5 @@ class TestAggregate:
         repo = _make_mock_repository()
         repo.aggregate = AsyncMock(side_effect=ValueError("Unsupported aggregation op"))
         ctx = _make_mock_ctx(repo)
-        result = json.loads(await tools.aggregate(operation="median", field="age", context=ctx))
+        result = json.loads(await mcp_tools.aggregate(operation="median", field="age", context=ctx))
         assert "error" in result

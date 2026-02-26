@@ -35,7 +35,7 @@ async def get_schema(context: Context) -> str:
     )
 
 async def select_rows(
-    filters: list[dict] | None = None,
+    filters: list[FilterCondition] | None = None,
     fields: list[str] | None = None,
     limit: int = Config.get("shared.default_query_limit"),
     order_by: str | None = None,
@@ -79,7 +79,7 @@ async def aggregate(
     operation: str,
     field: str | None = None,
     group_by: str | None = None,
-    filters: list[dict] | None = None,
+    filters: list[FilterCondition] | None = None,
     limit: int = Config.get("shared.default_query_limit"),
     order_by: str | None = None,
     order: str = "desc",
@@ -120,18 +120,7 @@ def _get_repository(context: Context) -> DataRepositoryProtocol:
     return repository
 
 
-def _parse_filters(raw: list[dict] | None) -> list[FilterCondition] | None: # TODO: Do we need this if we make sure filters are sent as FilterCondition?
-    if not raw:
+def _parse_filters(filters: list[FilterCondition] | None) -> list[FilterCondition] | None:
+    if not filters:
         return None
-    conditions: list[FilterCondition] = []
-    for item in raw:
-        if not isinstance(item, dict):
-            raise ValueError(f"Each filter must be a dict. Got: {type(item).__name__}")
-        conditions.append(
-            FilterCondition(
-                column=item.get("column", ""),
-                op=item.get("op", "=").upper(),
-                value=item.get("value", ""),
-            )
-        )
-    return conditions
+    return filters

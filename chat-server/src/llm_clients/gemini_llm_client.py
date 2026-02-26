@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import logging
 from uuid import uuid4
 
@@ -92,11 +93,58 @@ class GeminiLLMClient(LLMClientInterface):
             types.FunctionDeclaration(
                 name=tool["name"],
                 description=tool.get("description", ""),
-                parameters=tool.get("inputSchema"),
+                parameters=self._sanitize_schema(tool.get("inputSchema")),
             )
             for tool in mcp_tools
         ]
         return [types.Tool(function_declarations=function_declarations)]
+
+    # ── Schema sanitization ──────────────────────────────────────────────
+
+    @staticmethod
+    def _sanitize_schema(schema: dict | None) -> dict | None:
+        """Resolve $ref/$defs and strip keys unsupported by Gemini."""
+        if not schema:
+            return schema
+        resolved = GeminiLLMClient._resolve_refs(schema)
+        GeminiLLMClient._strip_unsupported_keys(resolved)
+        return resolved
+
+    @staticmethod
+    def _resolve_refs(schema: dict) -> dict:
+        """Deep-copy *schema*, inline all ``$ref`` pointers, then drop ``$defs``."""
+        schema = copy.deepcopy(schema)
+        defs = schema.pop("$defs", {})
+        if not defs:
+            return schema
+
+        def _inline(node):
+            if isinstance(node, dict):
+                if "$ref" in node:
+                    ref_path = node["$ref"]  # e.g. "#/$defs/FilterCondition"
+                    def_name = ref_path.rsplit("/", 1)[-1]
+                    resolved = copy.deepcopy(defs.get(def_name, {}))
+                    node.clear()
+                    node.update(resolved)
+                for value in node.values():
+                    _inline(value)
+            elif isinstance(node, list):
+                for item in node:
+                    _inline(item)
+
+        _inline(schema)
+        return schema
+
+    @staticmethod
+    def _strip_unsupported_keys(node) -> None:
+        """Recursively remove ``additionalProperties`` from every nested dict."""
+        if isinstance(node, dict):
+            node.pop("additionalProperties", None)
+            for value in node.values():
+                GeminiLLMClient._strip_unsupported_keys(value)
+        elif isinstance(node, list):
+            for item in node:
+                GeminiLLMClient._strip_unsupported_keys(item)
 
     async def _send_request(self, system_instruction, contents, tools):
         """Build config and call the Gemini content generation API."""
