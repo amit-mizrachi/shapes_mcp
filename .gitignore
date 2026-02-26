@@ -7,3 +7,8 @@ __pycache__/
 .venv/
 .idea/
 .DS_Store
+
+# Testing / Coverage
+.coverage
+htmlcov/
+.pytest_cache/
