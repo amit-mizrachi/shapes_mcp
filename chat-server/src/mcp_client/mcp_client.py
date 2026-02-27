@@ -14,7 +14,7 @@ class MCPClient:
         self._session: ClientSession | None = None
         self._streams = None
 
-    async def __aenter__(self) -> MCPClient:
+    async def __aenter__(self) -> "MCPClient":
         self._streams = streamablehttp_client(self._url)
         read, write, _ = await self._streams.__aenter__()
         try:

@@ -58,10 +58,11 @@ class TestGetSchema:
         result = json.loads(await mcp_tools.get_schema(ctx))
         assert "error" in result
 
-    async def test_no_repository_raises(self):
+    async def test_no_repository_returns_error(self):
         ctx = _make_mock_ctx(None)
-        with pytest.raises(RuntimeError, match="Repository not initialized"):
-            await mcp_tools.get_schema(ctx)
+        result = json.loads(await mcp_tools.get_schema(ctx))
+        assert "error" in result
+        assert "Repository not initialized" in result["error"]
 
 
 class TestSelectRows:
