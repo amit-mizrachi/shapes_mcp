@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pydantic import ConfigDict
 
 from shared.modules.shapes_base_model import ShapesBaseModel

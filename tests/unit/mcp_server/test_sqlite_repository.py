@@ -57,33 +57,33 @@ class TestSelectRows:
         assert "city" not in result.rows[0]
 
     async def test_select_with_equality_filter(self, repo_with_data):
-        filters = [FilterCondition(column="name", op="=", value="Alice")]
+        filters = [FilterCondition(column="name", operator="=", value="Alice")]
         result = await repo_with_data.select_rows(filters=filters)
         assert result.count == 1
         assert result.rows[0]["name"] == "Alice"
 
     async def test_select_with_gt_filter(self, repo_with_data):
-        filters = [FilterCondition(column="age", op=">", value=30)]
+        filters = [FilterCondition(column="age", operator=">", value=30)]
         result = await repo_with_data.select_rows(filters=filters)
         for row in result.rows:
             assert float(row["age"]) > 30
 
     async def test_select_with_gte_filter(self, repo_with_data):
-        filters = [FilterCondition(column="age", op=">=", value=35)]
+        filters = [FilterCondition(column="age", operator=">=", value=35)]
         result = await repo_with_data.select_rows(filters=filters)
         for row in result.rows:
             assert float(row["age"]) >= 35
 
     async def test_select_with_lt_filter(self, repo_with_data):
-        filters = [FilterCondition(column="score", op="<", value=80)]
+        filters = [FilterCondition(column="score", operator="<", value=80)]
         result = await repo_with_data.select_rows(filters=filters)
         for row in result.rows:
             assert float(row["score"]) < 80
 
     async def test_select_with_multiple_filters(self, repo_with_data):
         filters = [
-            FilterCondition(column="age", op=">", value=25),
-            FilterCondition(column="score", op=">=", value=90),
+            FilterCondition(column="age", operator=">", value=25),
+            FilterCondition(column="score", operator=">=", value=90),
         ]
         result = await repo_with_data.select_rows(filters=filters)
         for row in result.rows:
@@ -95,20 +95,20 @@ class TestSelectRows:
             await repo_with_data.select_rows(fields=["nonexistent"])
 
     async def test_select_invalid_filter_column_raises(self, repo_with_data):
-        filters = [FilterCondition(column="bad_col", op="=", value="x")]
+        filters = [FilterCondition(column="bad_col", operator="=", value="x")]
         with pytest.raises(ValueError, match="not found"):
             await repo_with_data.select_rows(filters=filters)
 
     async def test_select_invalid_filter_op_raises(self, repo_with_data):
         with pytest.raises(ValidationError, match="Invalid filter operator"):
-            FilterCondition(column="name", op="!=", value="Alice")
+            FilterCondition(column="name", operator="!=", value="Alice")
 
     async def test_select_no_filters_returns_all(self, repo_with_data):
         result = await repo_with_data.select_rows(filters=None)
         assert result.count == 5
 
     async def test_select_empty_result(self, repo_with_data):
-        filters = [FilterCondition(column="name", op="=", value="Nobody")]
+        filters = [FilterCondition(column="name", operator="=", value="Nobody")]
         result = await repo_with_data.select_rows(filters=filters)
         assert result.count == 0
         assert result.rows == []
@@ -148,7 +148,7 @@ class TestAggregate:
         assert groups.get("true", 0) + groups.get("false", 0) == 5
 
     async def test_aggregate_with_filter(self, repo_with_data):
-        filters = [FilterCondition(column="active", op="=", value="true")]
+        filters = [FilterCondition(column="active", operator="=", value="true")]
         result = await repo_with_data.aggregate(operation="count", filters=filters)
         assert result.rows[0]["result"] == 3
 
@@ -172,14 +172,14 @@ class TestAggregate:
 class TestSQLSafety:
     async def test_sql_injection_in_filter_column(self, repo_with_data):
         """Column name injection is blocked by validation against known columns."""
-        filters = [FilterCondition(column='"; DROP TABLE sample_data; --', op="=", value="x")]
+        filters = [FilterCondition(column='"; DROP TABLE sample_data; --', operator="=", value="x")]
         with pytest.raises(ValueError, match="not found"):
             await repo_with_data.select_rows(filters=filters)
 
     async def test_sql_injection_in_filter_op(self, repo_with_data):
         """Operator injection is blocked by allowlist."""
         with pytest.raises(ValidationError, match="Invalid filter operator"):
-            FilterCondition(column="name", op="= 1; DROP TABLE sample_data; --", value="x")
+            FilterCondition(column="name", operator="= 1; DROP TABLE sample_data; --", value="x")
 
     async def test_sql_injection_in_field_name(self, repo_with_data):
         with pytest.raises(ValueError, match="not found"):

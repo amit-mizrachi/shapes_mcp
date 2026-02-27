@@ -75,7 +75,7 @@ class TestSelectRows:
     async def test_with_filters(self):
         repo = _make_mock_repository()
         ctx = _make_mock_ctx(repo)
-        filters = [FilterCondition(column="age", op=">", value=25)]
+        filters = [FilterCondition(column="age", operator=">", value=25)]
         await mcp_tools.select_rows(filters=filters, context=ctx)
         repo.select_rows.assert_called_once()
         call_filters = repo.select_rows.call_args.kwargs["filters"]
@@ -108,10 +108,10 @@ class TestAggregate:
     async def test_with_filters(self):
         repo = _make_mock_repository()
         ctx = _make_mock_ctx(repo)
-        filters = [FilterCondition(column="age", op=">=", value=18)]
+        filters = [FilterCondition(column="age", operator=">=", value=18)]
         await mcp_tools.aggregate(operation="sum", field="score", filters=filters, context=ctx)
         call_filters = repo.aggregate.call_args.kwargs["filters"]
-        assert call_filters[0].op == ">="
+        assert call_filters[0].operator == ">="
 
     async def test_invalid_op_returns_error(self):
         repo = _make_mock_repository()

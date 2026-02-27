@@ -55,14 +55,14 @@ class TestMCPPipelineE2E:
 
     async def test_select_with_filter(self, real_pipeline):
         repo, _ = real_pipeline
-        filters = [FilterCondition(column="city", op="=", value="London")]
+        filters = [FilterCondition(column="city", operator="=", value="London")]
         result = await repo.select_rows(filters=filters)
         assert result.count == 1
         assert result.rows[0]["name"] == "Bob"
 
     async def test_select_with_numeric_filter(self, real_pipeline):
         repo, _ = real_pipeline
-        filters = [FilterCondition(column="age", op=">", value=30)]
+        filters = [FilterCondition(column="age", operator=">", value=30)]
         result = await repo.select_rows(filters=filters)
         names = {r["name"] for r in result.rows}
         assert "Charlie" in names
@@ -89,7 +89,7 @@ class TestMCPPipelineE2E:
 
     async def test_aggregate_with_filter(self, real_pipeline):
         repo, _ = real_pipeline
-        filters = [FilterCondition(column="active", op="=", value="true")]
+        filters = [FilterCondition(column="active", operator="=", value="true")]
         result = await repo.aggregate(operation="avg", field="score", filters=filters)
         avg = result.rows[0]["result"]
         assert avg == pytest.approx(91.97, abs=0.01)  # (95.5+92.3+88.1)/3
@@ -107,7 +107,7 @@ class TestToolsE2E:
         assert result["count"] == 5
 
     async def test_select_rows_with_filters(self, real_ctx):
-        filters = [FilterCondition(column="name", op="=", value="Alice")]
+        filters = [FilterCondition(column="name", operator="=", value="Alice")]
         result = json.loads(await mcp_tools.select_rows(filters=filters, context=real_ctx))
         assert result["count"] == 1
         assert result["data"][0]["name"] == "Alice"
@@ -127,7 +127,7 @@ class TestToolsE2E:
         assert result["count"] >= 2
 
     async def test_invalid_filter_returns_error(self, real_ctx):
-        filters = [FilterCondition(column="bad_col", op="=", value="x")]
+        filters = [FilterCondition(column="bad_col", operator="=", value="x")]
         result = json.loads(await mcp_tools.select_rows(filters=filters, context=real_ctx))
         assert "error" in result
 

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from shared.modules.llm.tool_call import ToolCall
 from shared.modules.shapes_base_model import ShapesBaseModel
 

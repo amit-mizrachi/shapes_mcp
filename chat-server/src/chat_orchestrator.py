@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import logging
 
 from llm_clients.llm_client_interface import LLMClientInterface
