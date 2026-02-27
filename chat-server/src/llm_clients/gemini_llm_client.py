@@ -5,18 +5,19 @@ from uuid import uuid4
 from google import genai
 from google.genai import types
 
-from llm_clients.llm_client_interface import LLMClientInterface
+from llm_clients.llm_client import LLMClient
+from shared.config import Config
 from shared.modules.llm.llm_response import LLMResponse
 from shared.modules.llm.tool_call import ToolCall
 
 logger = logging.getLogger(__name__)
 
 
-class GeminiLLMClient(LLMClientInterface):
-    def __init__(self, model: str, max_tokens: int):
+class GeminiLLMClient(LLMClient):
+    def __init__(self):
         self._client = genai.Client()
-        self._model = model
-        self._max_tokens = max_tokens
+        self._model = Config.get("chat_server.gemini_model")
+        self._max_tokens = Config.get("chat_server.gemini_max_tokens")
 
     async def invoke(self, messages: list[dict], tools: list[dict]) -> LLMResponse:
         """Send messages to Gemini and return a provider-agnostic LLMResponse."""

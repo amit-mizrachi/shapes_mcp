@@ -1,7 +1,8 @@
 import logging
 
-from llm_clients.llm_client_interface import LLMClientInterface
+from llm_clients.llm_client import LLMClient
 from mcp_client.mcp_client_manager import MCPClientManager
+from shared.config import Config
 from shared.modules.api.chat_request import ChatRequest
 from shared.modules.api.chat_response import ChatResponse
 from shared.modules.llm.llm_response import LLMResponse
@@ -13,15 +14,13 @@ logger = logging.getLogger(__name__)
 class ChatOrchestrator:
     def __init__(
         self,
-        llm_client: LLMClientInterface,
+        llm_client: LLMClient,
         mcp_manager: MCPClientManager,
-        system_prompt: str,
-        max_iterations: int,
     ):
         self._llm_client = llm_client
         self._mcp_manager = mcp_manager
-        self._system_prompt = system_prompt
-        self._max_iterations = max_iterations
+        self._system_prompt = Config.get("chat_server.system_prompt")
+        self._max_iterations = Config.get("chat_server.max_iterations")
 
     async def execute(self, request: ChatRequest) -> ChatResponse:
         messages = self._build_initial_messages(request)

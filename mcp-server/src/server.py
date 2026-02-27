@@ -25,45 +25,35 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def server_lifespan(server: FastMCP):
     logger.info("Starting MCP server")
-    db_path_str = Config.get("mcp_server.db_path")
-    db_path = Path(db_path_str)
+    db_path = Path(Config.get("mcp_server.db_path"))
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        csv_file_path = Config.get("mcp_server.csv_file_path")
-
         logger.info("Parsing CSV data")
-        parsed_csv = CSVParser.parse(csv_file_path)
+        parsed_csv = CSVParser.parse(Config.get("mcp_server.csv_file_path"))
 
         logger.info("Enriching parsed data")
         enricher = ColumnEnricher(rules=[DateEnrichmentRule(), FullNameEnrichmentRule()])
         enriched_csv = enricher.enrich(parsed_csv)
 
         logger.info("Ingesting enriched data to database")
-        ingester = SqliteIngester(db_path_str)
+        ingester = SqliteIngester()
         table_schema = ingester.ingest(enriched_csv)
 
         logger.info("Initializing data store")
-        repository = SqliteDataStore(db_path_str, table_schema)
+        repository = SqliteDataStore(table_schema)
 
         yield {"repository": repository}
     finally:
         if db_path.exists():
             db_path.unlink()
-            logger.info("Cleaned up database file: %s", db_path_str)
+            logger.info("Cleaned up database file: %s", db_path)
 
 
 host = Config.get("mcp_server.host")
 port = Config.get("mcp_server.port")
 streamable_http_path = Config.get("mcp_server.streamable_http_path")
-
-mcp_server = FastMCP(
-    "MCP Data Server",
-    lifespan=server_lifespan,
-    host=host,
-    port=port,
-    streamable_http_path=streamable_http_path,
-)
+mcp_server = FastMCP("MCP Data Server", lifespan=server_lifespan, host=host, port=port, streamable_http_path=streamable_http_path)
 
 mcp_server.tool()(tool_handlers.get_schema)
 mcp_server.tool()(tool_handlers.select_rows)

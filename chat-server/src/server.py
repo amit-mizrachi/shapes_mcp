@@ -23,41 +23,13 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    mcp_server_url = Config.get("chat_server.mcp_server_url")
-    mcp_max_concurrent = Config.get("chat_server.mcp_max_concurrent")
-    semaphore_timeout = Config.get("chat_server.semaphore_timeout")
-    mcp_manager = MCPClientManager(
-        url=mcp_server_url,
-        max_concurrent=mcp_max_concurrent,
-        semaphore_timeout=semaphore_timeout,
-    )
+    mcp_manager = MCPClientManager()
+    await mcp_manager.initialize()
 
-    retry_attempts = Config.get("chat_server.mcp_connection.retry_attempts")
-    retry_sleep = Config.get("chat_server.mcp_connection.retry_sleep")
-    for attempt in range(1, retry_attempts + 1):
-        try:
-            await mcp_manager.initialize()
-            logger.info("MCP connection established (attempt %d)", attempt)
-            break
-        except Exception:
-            if attempt == retry_attempts:
-                logger.error("Failed to connect to MCP server after %d attempts", retry_attempts)
-                raise
-            logger.warning("MCP connection attempt %d/%d failed, retrying in %ds...", attempt, retry_attempts, retry_sleep)
-            await asyncio.sleep(retry_sleep)
+    llm_client = LLMClientFactory.create()
 
-    llm_provider = Config.get("chat_server.llm_provider")
-    llm_client = LLMClientFactory.create(llm_provider)
-
-    app.state.orchestrator = ChatOrchestrator(
-        llm_client=llm_client,
-        mcp_manager=mcp_manager,
-        system_prompt=Config.get("chat_server.system_prompt"),
-        max_iterations=Config.get("chat_server.max_iterations"),
-    )
-
-    timeout_seconds = Config.get("chat_server.timeout_seconds")
-    app.state.timeout = timeout_seconds
+    app.state.orchestrator = ChatOrchestrator(llm_client=llm_client, mcp_manager=mcp_manager)
+    app.state.timeout = Config.get("chat_server.timeout_seconds")
 
     yield
 

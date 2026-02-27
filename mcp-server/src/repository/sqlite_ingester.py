@@ -1,12 +1,13 @@
 import sqlite3
 
+from shared.config import Config
 from shared.modules.data.parsed_csv import ParsedCSV
 from shared.modules.data.table_schema import TableSchema
 
 
 class SqliteIngester:
-    def __init__(self, db_uri: str) -> None:
-        self._db_uri = db_uri
+    def __init__(self) -> None:
+        self._db_uri = Config.get("mcp_server.db_path")
 
     def ingest(self, parsed_csv: ParsedCSV) -> TableSchema:
         connection = sqlite3.connect(self._db_uri)

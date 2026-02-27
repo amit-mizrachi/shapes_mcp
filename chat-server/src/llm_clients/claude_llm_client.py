@@ -3,18 +3,19 @@ import logging
 
 import anthropic
 
-from llm_clients.llm_client_interface import LLMClientInterface
+from llm_clients.llm_client import LLMClient
+from shared.config import Config
 from shared.modules.llm.llm_response import LLMResponse
 from shared.modules.llm.tool_call import ToolCall
 
 logger = logging.getLogger(__name__)
 
 
-class ClaudeLLMClient(LLMClientInterface):
-    def __init__(self, model: str, max_tokens: int):
+class ClaudeLLMClient(LLMClient):
+    def __init__(self):
         self._client = anthropic.AsyncAnthropic()
-        self._model = model
-        self._max_tokens = max_tokens
+        self._model = Config.get("chat_server.anthropic_model")
+        self._max_tokens = Config.get("chat_server.max_tokens")
 
 
     async def invoke(self, messages: list[dict], tools: list[dict]) -> LLMResponse:

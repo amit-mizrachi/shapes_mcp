@@ -16,8 +16,8 @@ from repository.data_store import DataStore
 logger = logging.getLogger(__name__)
 
 class SqliteDataStore(DataStore):
-    def __init__(self, db_uri: str, table_schema: TableSchema) -> None:
-        self._db_uri = db_uri
+    def __init__(self, table_schema: TableSchema) -> None:
+        self._db_uri = Config.get("mcp_server.db_path")
         self._table_schema = table_schema
         self._valid_columns = {c.name for c in table_schema.columns}
 
