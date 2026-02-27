@@ -8,24 +8,23 @@ from typing import Optional
 import aiosqlite
 
 from shared.config import Config
-from shared.modules.data.column_info import ColumnInfo
 from shared.modules.data.filter_condition import FilterCondition
 from shared.modules.data.query_result import QueryResult
 from shared.modules.data.table_schema import TableSchema
+from repository.data_store import DataStore
 
 logger = logging.getLogger(__name__)
 
-class SqliteRepository:
-    def __init__(self, db_uri: str, table_name: str, columns: list[ColumnInfo]) -> None:
+class SqliteDataStore(DataStore):
+    def __init__(self, db_uri: str, table_schema: TableSchema) -> None:
         self._db_uri = db_uri
-        self._table_name = table_name
-        self._columns = columns
-        self._valid_columns = {c.name for c in columns}
+        self._table_schema = table_schema
+        self._valid_columns = {c.name for c in table_schema.columns}
 
     async def get_schema(self) -> Optional[TableSchema]:
-        if not self._columns:
+        if not self._table_schema.columns:
             return None
-        return TableSchema(table_name=self._table_name, columns=self._columns)
+        return self._table_schema
 
     async def select_rows(
         self,
@@ -41,7 +40,7 @@ class SqliteRepository:
         where_clause, params = self._build_where_clause(filters)
         order_clause = self._build_order_clause(order_by, order)
 
-        sql_query = f'SELECT {distinct_keyword}{select_columns} FROM "{self._table_name}"{where_clause}{order_clause} LIMIT ?'
+        sql_query = f'SELECT {distinct_keyword}{select_columns} FROM "{self._table_schema.table_name}"{where_clause}{order_clause} LIMIT ?'
         params.append(limit)
 
         return await self._run_query(sql_query, params)
@@ -122,13 +121,13 @@ class SqliteRepository:
 
     def _build_aggregated_sql_query(self, aggregation_expression, where_clause, params, group_by, limit, order_by, order):
         if not group_by:
-            sql_query = f'SELECT {aggregation_expression} AS result FROM "{self._table_name}"{where_clause}'
+            sql_query = f'SELECT {aggregation_expression} AS result FROM "{self._table_schema.table_name}"{where_clause}'
             return sql_query, params
 
         order_clause = self._build_order_clause(order_by, order)
         sql_query = (
             f'SELECT "{group_by}", {aggregation_expression} AS result '
-            f'FROM "{self._table_name}"{where_clause} '
+            f'FROM "{self._table_schema.table_name}"{where_clause} '
             f'GROUP BY "{group_by}"{order_clause} LIMIT ?'
         )
         params.append(limit)

@@ -1,4 +1,4 @@
-"""Tests for mcp-server/src/mcp_tools.py — MCP tool handlers."""
+"""Tests for mcp-server/src/tool_handlers.py — MCP tool handlers."""
 
 import json
 from unittest.mock import AsyncMock, MagicMock
@@ -9,7 +9,7 @@ from shared.modules.data.column_info import ColumnInfo
 from shared.modules.data.filter_condition import FilterCondition
 from shared.modules.data.query_result import QueryResult
 from shared.modules.data.table_schema import TableSchema
-import mcp_tools
+import tool_handlers
 
 
 def _make_mock_ctx(repository=None):
@@ -46,7 +46,7 @@ class TestGetSchema:
     async def test_returns_schema_json(self):
         repo = _make_mock_repository()
         ctx = _make_mock_ctx(repo)
-        result = json.loads(await mcp_tools.get_schema(ctx))
+        result = json.loads(await tool_handlers.get_schema(ctx))
         assert result["table"] == "test_table"
         assert len(result["columns"]) == 2
         assert result["columns"][0]["name"] == "name"
@@ -55,12 +55,12 @@ class TestGetSchema:
         repo = AsyncMock()
         repo.get_schema = AsyncMock(return_value=None)
         ctx = _make_mock_ctx(repo)
-        result = json.loads(await mcp_tools.get_schema(ctx))
+        result = json.loads(await tool_handlers.get_schema(ctx))
         assert "error" in result
 
     async def test_no_repository_returns_error(self):
         ctx = _make_mock_ctx(None)
-        result = json.loads(await mcp_tools.get_schema(ctx))
+        result = json.loads(await tool_handlers.get_schema(ctx))
         assert "error" in result
         assert "Repository not initialized" in result["error"]
 
@@ -69,7 +69,7 @@ class TestSelectRows:
     async def test_basic_select(self):
         repo = _make_mock_repository()
         ctx = _make_mock_ctx(repo)
-        result = json.loads(await mcp_tools.select_rows(context=ctx))
+        result = json.loads(await tool_handlers.select_rows(context=ctx))
         assert result["count"] == 1
         assert result["data"][0]["name"] == "Alice"
 
@@ -77,7 +77,7 @@ class TestSelectRows:
         repo = _make_mock_repository()
         ctx = _make_mock_ctx(repo)
         filters = [FilterCondition(column="age", operator=">", value=25)]
-        await mcp_tools.select_rows(filters=filters, context=ctx)
+        await tool_handlers.select_rows(filters=filters, context=ctx)
         repo.select_rows.assert_called_once()
         call_filters = repo.select_rows.call_args.kwargs["filters"]
         assert call_filters[0].column == "age"
@@ -85,7 +85,7 @@ class TestSelectRows:
     async def test_with_fields_and_limit(self):
         repo = _make_mock_repository()
         ctx = _make_mock_ctx(repo)
-        await mcp_tools.select_rows(fields=["name"], limit=5, context=ctx)
+        await tool_handlers.select_rows(fields=["name"], limit=5, context=ctx)
         repo.select_rows.assert_called_once_with(
             filters=None, fields=["name"], limit=5,
             order_by=None, order="asc", distinct=False,
@@ -96,13 +96,13 @@ class TestAggregate:
     async def test_basic_count(self):
         repo = _make_mock_repository()
         ctx = _make_mock_ctx(repo)
-        result = json.loads(await mcp_tools.aggregate(operation="count", context=ctx))
+        result = json.loads(await tool_handlers.aggregate(operation="count", context=ctx))
         assert result["count"] == 1
 
     async def test_with_group_by(self):
         repo = _make_mock_repository()
         ctx = _make_mock_ctx(repo)
-        await mcp_tools.aggregate(operation="count", group_by="city", context=ctx)
+        await tool_handlers.aggregate(operation="count", group_by="city", context=ctx)
         repo.aggregate.assert_called_once()
         assert repo.aggregate.call_args.kwargs["group_by"] == "city"
 
@@ -110,7 +110,7 @@ class TestAggregate:
         repo = _make_mock_repository()
         ctx = _make_mock_ctx(repo)
         filters = [FilterCondition(column="age", operator=">=", value=18)]
-        await mcp_tools.aggregate(operation="sum", field="score", filters=filters, context=ctx)
+        await tool_handlers.aggregate(operation="sum", field="score", filters=filters, context=ctx)
         call_filters = repo.aggregate.call_args.kwargs["filters"]
         assert call_filters[0].operator == ">="
 
@@ -118,5 +118,5 @@ class TestAggregate:
         repo = _make_mock_repository()
         repo.aggregate = AsyncMock(side_effect=ValueError("Unsupported aggregation op"))
         ctx = _make_mock_ctx(repo)
-        result = json.loads(await mcp_tools.aggregate(operation="median", field="age", context=ctx))
+        result = json.loads(await tool_handlers.aggregate(operation="median", field="age", context=ctx))
         assert "error" in result

@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from abc import ABC, abstractmethod
 
 from shared.modules.data.filter_condition import FilterCondition
 from shared.modules.data.table_schema import TableSchema
 from shared.modules.data.query_result import QueryResult
 
 
-@runtime_checkable
-class DataRepositoryProtocol(Protocol):
+class DataStore(ABC):
+    @abstractmethod
     async def get_schema(self) -> TableSchema | None: ...
 
+    @abstractmethod
     async def select_rows(
         self,
         filters: list[FilterCondition] | None = None,
@@ -21,6 +22,7 @@ class DataRepositoryProtocol(Protocol):
         distinct: bool = False,
     ) -> QueryResult: ...
 
+    @abstractmethod
     async def aggregate(
         self,
         operation: str,

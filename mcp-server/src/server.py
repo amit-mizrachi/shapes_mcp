@@ -6,13 +6,13 @@ import uvicorn
 from mcp.server.fastmcp import FastMCP
 from starlette.responses import JSONResponse
 
-import mcp_tools
+import tool_handlers
 from enrichment.column_enricher import ColumnEnricher
 from enrichment.rules.date_enrichment_rule import DateEnrichmentRule
 from enrichment.rules.full_name_enrichment_rule import FullNameEnrichmentRule
 from repository.csv_parser import CSVParser
-from repository.sqlite.sqlite_ingester import SqliteIngester
-from repository.sqlite.sqlite_repository import SqliteRepository
+from repository.sqlite_ingester import SqliteIngester
+from repository.sqlite_data_store import SqliteDataStore
 from shared.config import Config
 
 logging.basicConfig(
@@ -41,10 +41,10 @@ async def server_lifespan(server: FastMCP):
 
         logger.info("Ingesting enriched data to database")
         ingester = SqliteIngester(db_path_str)
-        ingest_result = ingester.ingest(enriched_csv)
+        table_schema = ingester.ingest(enriched_csv)
 
-        logger.info("Initializing SQL Repository")
-        repository = SqliteRepository(db_path_str, ingest_result.table_name, ingest_result.columns)
+        logger.info("Initializing data store")
+        repository = SqliteDataStore(db_path_str, table_schema)
 
         yield {"repository": repository}
     finally:
@@ -65,9 +65,9 @@ mcp_server = FastMCP(
     streamable_http_path=streamable_http_path,
 )
 
-mcp_server.tool()(mcp_tools.get_schema)
-mcp_server.tool()(mcp_tools.select_rows)
-mcp_server.tool()(mcp_tools.aggregate)
+mcp_server.tool()(tool_handlers.get_schema)
+mcp_server.tool()(tool_handlers.select_rows)
+mcp_server.tool()(tool_handlers.aggregate)
 
 http_app = mcp_server.streamable_http_app()
 

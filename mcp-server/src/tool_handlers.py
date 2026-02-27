@@ -5,7 +5,7 @@ from mcp.server.fastmcp import Context
 
 from shared.config import Config
 from shared.modules.data.filter_condition import FilterCondition
-from repository.data_repository_protocol import DataRepositoryProtocol
+from repository.data_store import DataStore
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +99,7 @@ async def aggregate(
     - filters: list of filter objects, same format as select_rows.
       Example: [{"column": "age", "operator": ">=", "value": 18}]
     - limit: max groups to return when using group_by (default 20, max 100).
-    - order_by: column to sort grouped results by — the group column name or "result" (default "result"). Only applies when group_by is used.
+    - order_by: column name to sort grouped results by (e.g. the group_by column). Only applies when group_by is used. Results are unordered by default; apply your own sorting.
     - order: "asc" or "desc" (default "desc").
     """
     logger.info("Executing aggregation tool")
@@ -122,7 +122,7 @@ async def aggregate(
         return json.dumps({"error": f"Internal error: {e}"})
     return json.dumps({"data": query_result.rows, "count": query_result.count})
 
-def _get_repository(context: Context) -> DataRepositoryProtocol:
+def _get_repository(context: Context) -> DataStore:
     repository = context.request_context.lifespan_context.get("repository")
     if repository is None:
         logger.error("Repository not initialized")

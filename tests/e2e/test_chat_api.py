@@ -10,8 +10,8 @@ from httpx import ASGITransport, AsyncClient
 from shared.modules.llm.llm_response import LLMResponse
 from shared.modules.llm.tool_call import ToolCall
 from repository.csv_parser import CSVParser
-from repository.sqlite.sqlite_ingester import SqliteIngester
-from repository.sqlite.sqlite_repository import SqliteRepository
+from repository.sqlite_ingester import SqliteIngester
+from repository.sqlite_data_store import SqliteDataStore
 
 
 @pytest.fixture()
@@ -20,10 +20,10 @@ def real_mcp_pipeline(sample_csv_path, tmp_path):
     db_path = str(tmp_path / "e2e_chat.db")
 
     ingester = SqliteIngester(db_path)
-    result = ingester.ingest(CSVParser.parse(str(sample_csv_path)))
-    repo = SqliteRepository(db_path, result.table_name, result.columns)
+    table_schema = ingester.ingest(CSVParser.parse(str(sample_csv_path)))
+    repo = SqliteDataStore(db_path, table_schema)
 
-    yield repo, result
+    yield repo, table_schema
 
 
 @pytest.fixture()
@@ -89,7 +89,7 @@ async def _noop_lifespan(app):
 
 def _make_tool_caller(repo):
     """Create a side_effect function that routes tool calls to the real repository."""
-    import mcp_tools
+    import tool_handlers
     from unittest.mock import MagicMock
 
     ctx = MagicMock()
@@ -97,11 +97,11 @@ def _make_tool_caller(repo):
 
     async def call_tool(name, arguments):
         if name == "get_schema":
-            return await mcp_tools.get_schema(ctx)
+            return await tool_handlers.get_schema(ctx)
         elif name == "select_rows":
-            return await mcp_tools.select_rows(**arguments, context=ctx)
+            return await tool_handlers.select_rows(**arguments, context=ctx)
         elif name == "aggregate":
-            return await mcp_tools.aggregate(**arguments, context=ctx)
+            return await tool_handlers.aggregate(**arguments, context=ctx)
         return json.dumps({"error": f"Unknown tool: {name}"})
 
     return call_tool

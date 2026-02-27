@@ -1,23 +1,23 @@
-"""Tests for mcp-server/src/repository/sqlite/sqlite_repository.py — async queries, validation, SQL safety."""
+"""Tests for mcp-server/src/repository/sqlite_data_store.py — async queries, validation, SQL safety."""
 
 import sqlite3
 
 import pytest
 from pydantic import ValidationError
 
-from shared.modules.data.column_info import ColumnInfo
 from shared.modules.data.filter_condition import FilterCondition
+from shared.modules.data.table_schema import TableSchema
 from repository.csv_parser import CSVParser
-from repository.sqlite.sqlite_repository import SqliteRepository
-from repository.sqlite.sqlite_ingester import SqliteIngester
+from repository.sqlite_data_store import SqliteDataStore
+from repository.sqlite_ingester import SqliteIngester
 
 
 @pytest.fixture()
 def repo_with_data(test_db, sample_csv_path):
-    """Ingest sample data and return a SqliteRepository."""
+    """Ingest sample data and return a SqliteDataStore."""
     ingester = SqliteIngester(test_db)
-    result = ingester.ingest(CSVParser.parse(str(sample_csv_path)))
-    repo = SqliteRepository(test_db, result.table_name, result.columns)
+    table_schema = ingester.ingest(CSVParser.parse(str(sample_csv_path)))
+    repo = SqliteDataStore(test_db, table_schema)
     return repo
 
 
@@ -29,7 +29,7 @@ class TestGetSchema:
         assert len(schema.columns) == 5
 
     async def test_returns_none_when_no_columns(self, test_db):
-        repo = SqliteRepository(test_db, "empty", [])
+        repo = SqliteDataStore(test_db, TableSchema(table_name="empty", columns=[]))
         schema = await repo.get_schema()
         assert schema is None
 
