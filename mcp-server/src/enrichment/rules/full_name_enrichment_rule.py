@@ -8,12 +8,12 @@ _NAME_PAIRS = [
 ]
 
 
-class NameConcatenationRule(EnrichmentRule):
+class FullNameEnrichmentRule(EnrichmentRule):
 
     def __init__(self) -> None:
         self._pairs: list[tuple[str, str]] = []
 
-    def detect(self, columns: list[ColumnInfo], sample_rows: list[dict]) -> list[ColumnInfo]:
+    def infer_derived_columns(self, columns: list[ColumnInfo], sample_rows: list[dict]) -> list[ColumnInfo]:
         self._pairs = []
         col_names = {c.name for c in columns}
         new_columns: list[ColumnInfo] = []
@@ -25,7 +25,7 @@ class NameConcatenationRule(EnrichmentRule):
 
         return new_columns
 
-    def apply(self, rows: list[dict]) -> list[dict]:
+    def add_derived_columns(self, rows: list[dict]) -> list[dict]:
         for row in rows:
             for first_col, last_col in self._pairs:
                 first = str(row.get(first_col, "")).strip()

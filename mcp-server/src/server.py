@@ -7,7 +7,9 @@ from mcp.server.fastmcp import FastMCP
 from starlette.responses import JSONResponse
 
 import mcp_tools
-from enrichment.default_rules import create_default_enricher
+from enrichment.column_enricher import ColumnEnricher
+from enrichment.rules.date_enrichment_rule import DateEnrichmentRule
+from enrichment.rules.full_name_enrichment_rule import FullNameEnrichmentRule
 from repository.csv_parser import CSVParser
 from repository.sqlite.sqlite_ingester import SqliteIngester
 from repository.sqlite.sqlite_repository import SqliteRepository
@@ -34,7 +36,7 @@ async def server_lifespan(server: FastMCP):
         parsed_csv = CSVParser.parse(csv_file_path)
 
         logger.info("Enriching parsed data")
-        enricher = create_default_enricher()
+        enricher = ColumnEnricher(rules=[DateEnrichmentRule(), FullNameEnrichmentRule()])
         enriched_csv = enricher.enrich(parsed_csv)
 
         logger.info("Ingesting enriched data to database")

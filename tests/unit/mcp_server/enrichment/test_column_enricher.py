@@ -8,7 +8,7 @@ from shared.modules.data.column_info import ColumnInfo
 from shared.modules.data.parsed_csv import ParsedCSV
 from enrichment.column_enricher import ColumnEnricher
 from enrichment.rules.date_enrichment_rule import DateEnrichmentRule
-from enrichment.rules.name_concatenation_rule import NameConcatenationRule
+from enrichment.rules.full_name_enrichment_rule import FullNameEnrichmentRule
 
 
 def _make_parsed_csv(columns, rows, table_name="test_table"):
@@ -70,7 +70,7 @@ class TestEnrich:
                 {"first_name": "Charlie", "last_name": "Brown", "dob": "03/12/1985"},
             ],
         )
-        enricher = ColumnEnricher(rules=[DateEnrichmentRule(), NameConcatenationRule()])
+        enricher = ColumnEnricher(rules=[DateEnrichmentRule(), FullNameEnrichmentRule()])
         result = enricher.enrich(parsed)
 
         col_names = [c.name for c in result.columns]

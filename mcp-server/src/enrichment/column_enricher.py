@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import logging
 
+from shared.config import Config
 from shared.modules.data.column_info import ColumnInfo
 from shared.modules.data.parsed_csv import ParsedCSV
 from enrichment.enrichment_rule import EnrichmentRule
 
 logger = logging.getLogger(__name__)
-
-_MAX_SAMPLES = 3
 
 
 class ColumnEnricher:
@@ -19,10 +18,11 @@ class ColumnEnricher:
         new_columns: list[ColumnInfo] = []
         applicable_rules: list[EnrichmentRule] = []
 
-        sample_rows = parsed_csv.rows[:20]
+        detection_sample_size = Config.get("mcp_server.enrichment.detection_sample_size")
+        sample_rows = parsed_csv.rows[:detection_sample_size]
 
         for rule in self._rules:
-            detected = rule.detect(parsed_csv.columns, sample_rows)
+            detected = rule.infer_derived_columns(parsed_csv.columns, sample_rows)
             if detected:
                 new_columns.extend(detected)
                 applicable_rules.append(rule)
@@ -37,7 +37,7 @@ class ColumnEnricher:
 
         enriched_rows = [{**row} for row in parsed_csv.rows]
         for rule in applicable_rules:
-            enriched_rows = rule.apply(enriched_rows)
+            enriched_rows = rule.add_derived_columns(enriched_rows)
 
         new_columns = self._populate_samples(new_columns, enriched_rows)
 
@@ -53,10 +53,12 @@ class ColumnEnricher:
     ) -> list[ColumnInfo]:
         """Return new ColumnInfo objects with samples populated from the first rows."""
         result = []
+        max_samples = Config.get("mcp_server.enrichment.max_samples")
+
         for col in columns:
             samples = [
                 str(row[col.name])
-                for row in rows[:_MAX_SAMPLES]
+                for row in rows[:max_samples]
                 if row.get(col.name) is not None
             ]
             result.append(ColumnInfo(name=col.name, detected_type=col.detected_type, samples=samples))

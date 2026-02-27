@@ -25,7 +25,7 @@ class DateEnrichmentRule(EnrichmentRule):
     def __init__(self) -> None:
         self._date_columns: list[tuple[str, str]] = []
 
-    def detect(self, columns: list[ColumnInfo], sample_rows: list[dict]) -> list[ColumnInfo]:
+    def infer_derived_columns(self, columns: list[ColumnInfo], sample_rows: list[dict]) -> list[ColumnInfo]:
         self._date_columns = []
         new_columns: list[ColumnInfo] = []
         existing_names = {c.name for c in columns}
@@ -48,7 +48,7 @@ class DateEnrichmentRule(EnrichmentRule):
 
         return new_columns
 
-    def apply(self, rows: list[dict]) -> list[dict]:
+    def add_derived_columns(self, rows: list[dict]) -> list[dict]:
         today = date.today()
         for row in rows:
             for col_name, fmt in self._date_columns:
@@ -64,10 +64,10 @@ class DateEnrichmentRule(EnrichmentRule):
                     continue
 
                 try:
-                    parsed = datetime.strptime(raw, fmt).date()
-                    row[years_ago_key] = self._years_between(parsed, today)
-                    row[year_key] = parsed.year
-                    row[month_key] = parsed.month
+                    parsed_date = datetime.strptime(raw, fmt).date()
+                    row[years_ago_key] = self._years_between(parsed_date, today)
+                    row[year_key] = parsed_date.year
+                    row[month_key] = parsed_date.month
                 except ValueError:
                     row[years_ago_key] = None
                     row[year_key] = None
