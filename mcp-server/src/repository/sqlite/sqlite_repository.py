@@ -31,7 +31,7 @@ class SqliteRepository:
         self,
         filters: Optional[list[FilterCondition]] = None,
         fields: Optional[list[str]] = None,
-        limit: int = Config.get("shared.default_query_limit"),
+        limit: int = Config.get("mcp_server.default_query_limit"),
         order_by: Optional[str] = None,
         order: str = "asc",
         distinct: bool = False,
@@ -52,7 +52,7 @@ class SqliteRepository:
         field: Optional[str] = None,
         group_by: Optional[str] = None,
         filters: Optional[list[FilterCondition]] = None,
-        limit: int = Config.get("shared.default_query_limit"),
+        limit: int = Config.get("mcp_server.default_query_limit"),
         order_by: Optional[str] = None,
         order: str = "desc",
     ) -> QueryResult:
@@ -79,7 +79,7 @@ class SqliteRepository:
         for filter_condition in filter_conditions:
             self._validate_column(filter_condition.column)
             parts.append(self._filter_to_sql_expression(filter_condition))
-            if filter_condition.op == "IN":
+            if filter_condition.operator == "IN":
                 params.extend(filter_condition.value)
             else:
                 params.append(filter_condition.value)
@@ -87,12 +87,12 @@ class SqliteRepository:
         return where_clause, params
 
     def _filter_to_sql_expression(self, filter_condition: FilterCondition) -> str:
-        if filter_condition.op == "LIKE":
+        if filter_condition.operator == "LIKE":
             return f'"{filter_condition.column}" LIKE ?'
-        if filter_condition.op == "IN":
+        if filter_condition.operator == "IN":
             placeholders = ",".join("?" * len(filter_condition.value))
             return f'"{filter_condition.column}" IN ({placeholders})'
-        return f'"{filter_condition.column}" {filter_condition.op} ?'
+        return f'"{filter_condition.column}" {filter_condition.operator} ?'
 
     def _build_order_clause(self, order_by: Optional[str], order: str) -> str:
         if order_by is None:
@@ -143,7 +143,7 @@ class SqliteRepository:
             try:
                 return await self._execute_query(connection, sql_query, params)
             except Exception:
-                logger.error("query failed")
+                logger.error("query failed | sql=%s params=%s", sql_query, params, exc_info=True)
                 raise
 
     @asynccontextmanager

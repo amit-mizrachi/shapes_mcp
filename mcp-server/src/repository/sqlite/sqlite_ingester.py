@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import sqlite3
 
 from shared.modules.data.parsed_csv import ParsedCSV
@@ -33,10 +31,14 @@ class SqliteIngester:
     def _insert_rows(self, connection: sqlite3.Connection, parsed_csv: ParsedCSV) -> None:
         column_types = {c.name: c.detected_type for c in parsed_csv.columns}
         placeholders = ", ".join("?" for _ in parsed_csv.headers)
-        cursor = connection.cursor()
-        for row in parsed_csv.rows:
-            values = [self._to_sql_value(row[h], column_types[h]) for h in parsed_csv.headers]
-            cursor.execute(f'INSERT INTO "{parsed_csv.table_name}" VALUES ({placeholders})', values)
+        all_values = [
+            [self._to_sql_value(row[h], column_types[h]) for h in parsed_csv.headers]
+            for row in parsed_csv.rows
+        ]
+        connection.cursor().executemany(
+            f'INSERT INTO "{parsed_csv.table_name}" VALUES ({placeholders})',
+            all_values,
+        )
 
     @staticmethod
     def _to_sql_value(raw_value, detected_type: str) -> float | None | str:

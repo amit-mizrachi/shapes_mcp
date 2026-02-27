@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import logging
 
@@ -18,8 +16,12 @@ async def get_schema(context: Context) -> str:
     Use this tool FIRST to understand what data is available before querying.
     Takes no parameters.
     """
-    repository = _get_repository(context)
-    schema = await repository.get_schema()
+    try:
+        repository = _get_repository(context)
+        schema = await repository.get_schema()
+    except Exception as e:
+        logger.error("get_schema failed unexpectedly", exc_info=True)
+        return json.dumps({"error": f"Internal error: {e}"})
     if schema is None:
         logger.warning("get_schema called but no data is loaded")
         return json.dumps({"error": "No data loaded"})
@@ -37,7 +39,7 @@ async def get_schema(context: Context) -> str:
 async def select_rows(
     filters: list[FilterCondition] | None = None,
     fields: list[str] | None = None,
-    limit: int = Config.get("shared.default_query_limit"),
+    limit: int = Config.get("mcp_server.default_query_limit"),
     order_by: str | None = None,
     order: str = "asc",
     distinct: bool = False,
@@ -48,11 +50,11 @@ async def select_rows(
     - fields: list of column names to return (default: all columns).
     - filters: list of filter objects. Each has:
         - "column": column name
-        - "op": one of "=", ">", ">=", "<", "<=", "LIKE", "IN" (default "=")
+        - "operator": one of "=", ">", ">=", "<", "<=", "LIKE", "IN" (default "=")
         - "value": the value to compare against. For IN, pass a list of values.
-      Example: [{"column": "age", "op": ">", "value": 30}, {"column": "city", "value": "London"}]
-      LIKE example: [{"column": "name", "op": "LIKE", "value": "%son%"}]
-      IN example: [{"column": "city", "op": "IN", "value": ["London", "Paris"]}]
+      Example: [{"column": "age", "operator": ">", "value": 30}, {"column": "city", "value": "London"}]
+      LIKE example: [{"column": "name", "operator": "LIKE", "value": "%son%"}]
+      IN example: [{"column": "city", "operator": "IN", "value": ["London", "Paris"]}]
     - limit: max rows to return (default 20, max 100).
     - order_by: column name to sort results by.
     - order: "asc" or "desc" (default "asc").
@@ -63,14 +65,19 @@ async def select_rows(
     order = order.lower()
     if order not in ("asc", "desc"):
         return json.dumps({"error": "order must be 'asc' or 'desc'"})
+    max_limit = Config.get("mcp_server.max_query_limit")
+    limit = max(1, min(limit, max_limit))
     try:
         query_result = await repository.select_rows(
             filters=filters, fields=fields, limit=limit,
             order_by=order_by, order=order, distinct=distinct,
         )
     except ValueError as e:
-        logger.warning("select_rows validation failed")
+        logger.warning("select_rows validation error: %s", e)
         return json.dumps({"error": str(e)})
+    except Exception as e:
+        logger.error("select_rows failed unexpectedly", exc_info=True)
+        return json.dumps({"error": f"Internal error: {e}"})
     return json.dumps({"data": query_result.rows, "count": query_result.count})
 
 
@@ -79,7 +86,7 @@ async def aggregate(
     field: str | None = None,
     group_by: str | None = None,
     filters: list[FilterCondition] | None = None,
-    limit: int = Config.get("shared.default_query_limit"),
+    limit: int = Config.get("mcp_server.default_query_limit"),
     order_by: str | None = None,
     order: str = "desc",
     context: Context = None,
@@ -90,7 +97,7 @@ async def aggregate(
     - field: column to aggregate (not required for "count").
     - group_by: optional column to group results by.
     - filters: list of filter objects, same format as select_rows.
-      Example: [{"column": "age", "op": ">=", "value": 18}]
+      Example: [{"column": "age", "operator": ">=", "value": 18}]
     - limit: max groups to return when using group_by (default 20, max 100).
     - order_by: column to sort grouped results by — the group column name or "result" (default "result"). Only applies when group_by is used.
     - order: "asc" or "desc" (default "desc").
@@ -100,14 +107,19 @@ async def aggregate(
     order = order.lower()
     if order not in ("asc", "desc"):
         return json.dumps({"error": "order must be 'asc' or 'desc'"})
+    max_limit = Config.get("mcp_server.max_query_limit")
+    limit = max(1, min(limit, max_limit))
     try:
         query_result = await repository.aggregate(
             operation=operation, field=field, group_by=group_by, filters=filters, limit=limit,
             order_by=order_by, order=order,
         )
     except ValueError as e:
-        logger.warning("aggregate validation failed")
+        logger.warning("aggregate validation error: %s", e)
         return json.dumps({"error": str(e)})
+    except Exception as e:
+        logger.error("aggregate failed unexpectedly", exc_info=True)
+        return json.dumps({"error": f"Internal error: {e}"})
     return json.dumps({"data": query_result.rows, "count": query_result.count})
 
 def _get_repository(context: Context) -> DataRepositoryProtocol:

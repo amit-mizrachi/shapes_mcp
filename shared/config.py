@@ -1,7 +1,8 @@
 class Config:
     _values = {
         # ── Shared ──
-        "shared.default_query_limit": 20,
+        "mcp_server.default_query_limit": 20,
+        "mcp_server.max_query_limit":     100,
 
         # ── MCP Server ──
         "mcp_server.db_path":              "/app/db/shapes.db",
