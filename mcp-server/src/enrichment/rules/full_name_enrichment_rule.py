@@ -15,11 +15,11 @@ class FullNameEnrichmentRule(EnrichmentRule):
 
     def infer_derived_columns(self, columns: list[ColumnInfo], sample_rows: list[dict]) -> list[ColumnInfo]:
         self._pairs = []
-        col_names = {c.name for c in columns}
+        column_names = {c.name for c in columns}
         new_columns: list[ColumnInfo] = []
 
         for first_col, last_col in _NAME_PAIRS:
-            if first_col in col_names and last_col in col_names and "full_name" not in col_names:
+            if first_col in column_names and last_col in column_names and "full_name" not in column_names:
                 self._pairs.append((first_col, last_col))
                 new_columns.append(ColumnInfo(name="full_name", detected_type="text", samples=[]))
 

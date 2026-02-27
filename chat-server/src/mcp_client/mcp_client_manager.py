@@ -10,8 +10,6 @@ logger = logging.getLogger(__name__)
 
 
 class MCPClientManager:
-    """Creates ephemeral MCP clients with concurrency control and tool caching."""
-
     def __init__(self):
         self._url = Config.get("chat_server.mcp_server_url")
         self._semaphore = asyncio.Semaphore(Config.get("chat_server.mcp_max_concurrent"))
@@ -19,7 +17,6 @@ class MCPClientManager:
         self._tools: list[dict] = []
 
     async def initialize(self) -> None:
-        """Fetch and cache tool definitions once at startup, with retries."""
         retry_attempts = Config.get("chat_server.mcp_connection.retry_attempts")
         retry_sleep = Config.get("chat_server.mcp_connection.retry_sleep")
         for attempt in range(1, retry_attempts + 1):
@@ -41,7 +38,6 @@ class MCPClientManager:
 
     @asynccontextmanager
     async def client(self) -> AsyncIterator[MCPClient]:
-        """Create an ephemeral client, gated by semaphore."""
         try:
             await asyncio.wait_for(self._semaphore.acquire(), timeout=self._semaphore_timeout)
         except asyncio.TimeoutError:
