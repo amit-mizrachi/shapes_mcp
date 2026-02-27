@@ -1,8 +1,8 @@
-"""Tests for mcp-server/src/repository/csv_parser.py — type detection, sanitization, parsing."""
+"""Tests for mcp-server/src/data_store/csv_parser.py — type detection, sanitization, parsing."""
 
 import pytest
 
-from repository.csv_parser import CSVParser
+from data_store.csv_parser import CSVParser
 from shared.modules.data.parsed_csv import ParsedCSV
 
 

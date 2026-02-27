@@ -10,9 +10,9 @@ import tool_handlers
 from enrichment.column_enricher import ColumnEnricher
 from enrichment.rules.date_enrichment_rule import DateEnrichmentRule
 from enrichment.rules.full_name_enrichment_rule import FullNameEnrichmentRule
-from repository.csv_parser import CSVParser
-from repository.sqlite_ingester import SqliteIngester
-from repository.sqlite_data_store import SqliteDataStore
+from data_store.csv_parser import CSVParser
+from data_store.sqlite_ingester import SqliteIngester
+from data_store.sqlite_data_store import SqliteDataStore
 from shared.config import Config
 
 logging.basicConfig(
@@ -29,25 +29,27 @@ async def server_lifespan(server: FastMCP):
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        logger.info("Parsing CSV data")
-        parsed_csv = CSVParser.parse(Config.get("mcp_server.csv_file_path"))
-
-        logger.info("Enriching parsed data")
-        enricher = ColumnEnricher(rules=[DateEnrichmentRule(), FullNameEnrichmentRule()])
-        enriched_csv = enricher.enrich(parsed_csv)
-
-        logger.info("Ingesting enriched data to database")
-        ingester = SqliteIngester()
-        table_schema = ingester.ingest(enriched_csv)
-
-        logger.info("Initializing data store")
-        repository = SqliteDataStore(table_schema)
-
-        yield {"repository": repository}
+        data_store = build_data_store(Config.get("mcp_server.csv_file_path"))
+        yield {"data_store": data_store}
     finally:
         if db_path.exists():
             db_path.unlink()
             logger.info("Cleaned up database file: %s", db_path)
+
+def build_data_store(csv_path: str) -> SqliteDataStore:
+    logger.info("Parsing CSV data")
+    parsed_csv = CSVParser.parse(csv_path)
+
+    logger.info("Enriching parsed data")
+    enricher = ColumnEnricher(rules=[DateEnrichmentRule(), FullNameEnrichmentRule()])
+    enriched_csv = enricher.enrich(parsed_csv)
+
+    logger.info("Ingesting enriched data to database")
+    ingester = SqliteIngester()
+    table_schema = ingester.ingest(enriched_csv)
+
+    logger.info("Initializing data store")
+    return SqliteDataStore(table_schema=table_schema)
 
 
 host = Config.get("mcp_server.host")

@@ -6,8 +6,8 @@ from shared.modules.data.table_schema import TableSchema
 
 
 class SqliteIngester:
-    def __init__(self) -> None:
-        self._db_uri = Config.get("mcp_server.db_path")
+    def __init__(self, db_path: str | None = None) -> None:
+        self._db_uri = db_path or Config.get("mcp_server.db_path")
 
     def ingest(self, parsed_csv: ParsedCSV) -> TableSchema:
         connection = sqlite3.connect(self._db_uri)

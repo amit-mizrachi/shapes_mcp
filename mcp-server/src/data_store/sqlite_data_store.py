@@ -11,13 +11,13 @@ from shared.config import Config
 from shared.modules.data.filter_condition import FilterCondition
 from shared.modules.data.query_result import QueryResult
 from shared.modules.data.table_schema import TableSchema
-from repository.data_store import DataStore
+from data_store.data_store import DataStore
 
 logger = logging.getLogger(__name__)
 
 class SqliteDataStore(DataStore):
-    def __init__(self, table_schema: TableSchema) -> None:
-        self._db_uri = Config.get("mcp_server.db_path")
+    def __init__(self, db_path: str | None = None, table_schema: TableSchema = None) -> None:
+        self._db_uri = db_path or Config.get("mcp_server.db_path")
         self._table_schema = table_schema
         self._valid_columns = {c.name for c in table_schema.columns}
 
@@ -37,7 +37,7 @@ class SqliteDataStore(DataStore):
     ) -> QueryResult:
         distinct_keyword = "DISTINCT " if distinct else ""
         select_columns = self._build_select_columns(fields)
-        where_clause, params = self._build_where_clause(filters)
+        where_clause, params = self._build_where_clause(filters) # TODO: not so clear - build where clause & params? why both?
         order_clause = self._build_order_clause(order_by, order)
 
         sql_query = f'SELECT {distinct_keyword}{select_columns} FROM "{self._table_schema.table_name}"{where_clause}{order_clause} LIMIT ?'
@@ -66,15 +66,19 @@ class SqliteDataStore(DataStore):
     def _build_select_columns(self, fields: Optional[list[str]]) -> str:
         if not fields:
             return "*"
+
         for field_name in fields:
             self._validate_column(field_name)
+
         return ", ".join(f'"{field_name}"' for field_name in fields)
 
     def _build_where_clause(self, filter_conditions: Optional[list[FilterCondition]],) -> tuple[str, list]:
         if not filter_conditions:
             return "", []
+
         parts: list[str] = []
         params: list = []
+
         for filter_condition in filter_conditions:
             self._validate_column(filter_condition.column)
             parts.append(self._filter_to_sql_expression(filter_condition))
@@ -82,41 +86,51 @@ class SqliteDataStore(DataStore):
                 params.extend(filter_condition.value)
             else:
                 params.append(filter_condition.value)
+
         where_clause = " WHERE " + " AND ".join(parts)
         return where_clause, params
 
     def _filter_to_sql_expression(self, filter_condition: FilterCondition) -> str:
         if filter_condition.operator == "LIKE":
             return f'"{filter_condition.column}" LIKE ?'
+
         if filter_condition.operator == "IN":
             placeholders = ",".join("?" * len(filter_condition.value))
             return f'"{filter_condition.column}" IN ({placeholders})'
+
         return f'"{filter_condition.column}" {filter_condition.operator} ?'
 
     def _build_order_clause(self, order_by: Optional[str], order: str) -> str:
         if order_by is None:
             return ""
+
         self._validate_column(order_by)
+
         normalized_order = order.upper()
         if normalized_order not in ("ASC", "DESC"):
             raise ValueError(f"order must be 'asc' or 'desc', got: {order!r}")
+
         return f' ORDER BY "{order_by}" {normalized_order}'
 
     def _validate_aggregation_args(self, operation: str, field: Optional[str], group_by: Optional[str]) -> str:
         sql_operation = operation.upper()
         if sql_operation not in ("COUNT", "SUM", "AVG", "MIN", "MAX"):
             raise ValueError(f"Unsupported aggregation op: {operation}. Use count, sum, avg, min, or max.")
+
         if sql_operation != "COUNT":
             if not field:
                 raise ValueError(f"'field' is required for {operation}.")
             self._validate_column(field)
+
         if group_by:
             self._validate_column(group_by)
+
         return sql_operation
 
     def _build_aggregation_expression(self, sql_operation: str, field: Optional[str]) -> str:
         if sql_operation == "COUNT":
             return "COUNT(*)"
+
         return f'{sql_operation}("{field}")'
 
     def _build_aggregated_sql_query(self, aggregation_expression, where_clause, params, group_by, limit, order_by, order):
@@ -167,4 +181,5 @@ class SqliteDataStore(DataStore):
         rows = await cursor.fetchall()
         columns = [d[0] for d in cursor.description]
         row_dicts = [dict(zip(columns, row)) for row in rows]
+
         return QueryResult(columns=columns, rows=row_dicts, count=len(row_dicts))

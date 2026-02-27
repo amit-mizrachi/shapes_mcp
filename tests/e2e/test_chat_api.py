@@ -9,9 +9,9 @@ from httpx import ASGITransport, AsyncClient
 
 from shared.modules.llm.llm_response import LLMResponse
 from shared.modules.llm.tool_call import ToolCall
-from repository.csv_parser import CSVParser
-from repository.sqlite_ingester import SqliteIngester
-from repository.sqlite_data_store import SqliteDataStore
+from data_store.csv_parser import CSVParser
+from data_store.sqlite_ingester import SqliteIngester
+from data_store.sqlite_data_store import SqliteDataStore
 
 
 @pytest.fixture()
@@ -21,9 +21,9 @@ def real_mcp_pipeline(sample_csv_path, tmp_path):
 
     ingester = SqliteIngester(db_path)
     table_schema = ingester.ingest(CSVParser.parse(str(sample_csv_path)))
-    repo = SqliteDataStore(db_path, table_schema)
+    store = SqliteDataStore(db_path, table_schema)
 
-    yield repo, table_schema
+    yield store, table_schema
 
 
 @pytest.fixture()
@@ -43,10 +43,10 @@ def mock_llm_for_e2e():
 @pytest.fixture()
 async def e2e_client(real_mcp_pipeline, mock_llm_for_e2e):
     """FastAPI app with real MCP tools + mocked LLM, bypassing the lifespan."""
-    repo, _ = real_mcp_pipeline
+    store, _ = real_mcp_pipeline
 
     mock_mcp_client = AsyncMock()
-    mock_mcp_client.call_tool = AsyncMock(side_effect=_make_tool_caller(repo))
+    mock_mcp_client.call_tool = AsyncMock(side_effect=_make_tool_caller(store))
 
     mock_manager = MagicMock()
     mock_manager.get_tools = MagicMock(return_value=[
@@ -87,13 +87,13 @@ async def _noop_lifespan(app):
     yield
 
 
-def _make_tool_caller(repo):
-    """Create a side_effect function that routes tool calls to the real repository."""
+def _make_tool_caller(data_store):
+    """Create a side_effect function that routes tool calls to the real data store."""
     import tool_handlers
     from unittest.mock import MagicMock
 
     ctx = MagicMock()
-    ctx.request_context.lifespan_context = {"repository": repo}
+    ctx.request_context.lifespan_context = {"data_store": data_store}
 
     async def call_tool(name, arguments):
         if name == "get_schema":

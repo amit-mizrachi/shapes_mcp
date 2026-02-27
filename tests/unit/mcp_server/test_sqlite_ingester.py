@@ -1,11 +1,11 @@
-"""Tests for mcp-server/src/repository/sqlite_ingester.py — CSV ingestion to SQLite."""
+"""Tests for mcp-server/src/data_store/sqlite_ingester.py — CSV ingestion to SQLite."""
 
 import sqlite3
 
 import pytest
 
-from repository.csv_parser import CSVParser
-from repository.sqlite_ingester import SqliteIngester
+from data_store.csv_parser import CSVParser
+from data_store.sqlite_ingester import SqliteIngester
 
 
 class TestSqliteIngester:

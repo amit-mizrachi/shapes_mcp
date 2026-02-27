@@ -5,7 +5,7 @@ from mcp.server.fastmcp import Context
 
 from shared.config import Config
 from shared.modules.data.filter_condition import FilterCondition
-from repository.data_store import DataStore
+from data_store.data_store import DataStore
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +17,8 @@ async def get_schema(context: Context) -> str:
     Takes no parameters.
     """
     try:
-        repository = _get_repository(context)
-        schema = await repository.get_schema()
+        data_store = _get_data_store(context)
+        schema = await data_store.get_schema()
     except Exception as e:
         logger.error("get_schema failed unexpectedly", exc_info=True)
         return json.dumps({"error": f"Internal error: {e}"})
@@ -61,14 +61,14 @@ async def select_rows(
     - distinct: if true, return only unique combinations of the selected fields.
     """
     logger.info("Executing row selection tool")
-    repository = _get_repository(context)
+    data_store = _get_data_store(context)
     order = order.lower()
     if order not in ("asc", "desc"):
         return json.dumps({"error": "order must be 'asc' or 'desc'"})
     max_limit = Config.get("mcp_server.max_query_limit")
     limit = max(1, min(limit, max_limit))
     try:
-        query_result = await repository.select_rows(
+        query_result = await data_store.select_rows(
             filters=filters, fields=fields, limit=limit,
             order_by=order_by, order=order, distinct=distinct,
         )
@@ -106,14 +106,14 @@ async def aggregate(
     - order: "asc" or "desc" (default "desc").
     """
     logger.info("Executing aggregation tool")
-    repository = _get_repository(context)
+    data_store = _get_data_store(context)
     order = order.lower()
     if order not in ("asc", "desc"):
         return json.dumps({"error": "order must be 'asc' or 'desc'"})
     max_limit = Config.get("mcp_server.max_query_limit")
     limit = max(1, min(limit, max_limit))
     try:
-        query_result = await repository.aggregate(
+        query_result = await data_store.aggregate(
             operation=operation, field=field, group_by=group_by, filters=filters, limit=limit,
             order_by=order_by, order=order,
         )
@@ -125,9 +125,9 @@ async def aggregate(
         return json.dumps({"error": f"Internal error: {e}"})
     return json.dumps({"data": query_result.rows, "count": query_result.count})
 
-def _get_repository(context: Context) -> DataStore:
-    repository = context.request_context.lifespan_context.get("repository")
-    if repository is None:
-        logger.error("Repository not initialized")
-        raise RuntimeError("Repository not initialized")
-    return repository
+def _get_data_store(context: Context) -> DataStore:
+    data_store = context.request_context.lifespan_context.get("data_store")
+    if data_store is None:
+        logger.error("DataStore not initialized")
+        raise RuntimeError("DataStore not initialized")
+    return data_store
