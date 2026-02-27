@@ -6,6 +6,8 @@ class Config:
         # ── MCP Server ──
         "mcp_server.db_path":              "/app/db/shapes.db",
         "mcp_server.csv_file_path":        "/app/data/people-list-export.csv",
+        "mcp_server.enrichment.detection_sample_size" : 20,
+        "mcp_server.enrichment.max_samples": 3,
         "mcp_server.host":                 "0.0.0.0",
         "mcp_server.port":                 3001,
         "mcp_server.streamable_http_path": "/mcp",
