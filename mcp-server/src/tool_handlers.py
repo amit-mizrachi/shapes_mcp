@@ -99,7 +99,10 @@ async def aggregate(
     - filters: list of filter objects, same format as select_rows.
       Example: [{"column": "age", "operator": ">=", "value": 18}]
     - limit: max groups to return when using group_by (default 20, max 100).
-    - order_by: column name to sort grouped results by (e.g. the group_by column). Only applies when group_by is used. Results are unordered by default; apply your own sorting.
+    - order_by: column name to sort grouped results by, or "@result" to sort by the
+      aggregated value (e.g. count, sum, avg). Only applies when group_by is used.
+      Example: to get the top 5 cities by count, use
+      group_by="city", order_by="@result", order="desc", limit=5.
     - order: "asc" or "desc" (default "desc").
     """
     logger.info("Executing aggregation tool")

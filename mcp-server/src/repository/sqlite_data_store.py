@@ -97,10 +97,10 @@ class SqliteDataStore(DataStore):
         if order_by is None:
             return ""
         self._validate_column(order_by)
-        normalized = order.upper()
-        if normalized not in ("ASC", "DESC"):
+        normalized_order = order.upper()
+        if normalized_order not in ("ASC", "DESC"):
             raise ValueError(f"order must be 'asc' or 'desc', got: {order!r}")
-        return f' ORDER BY "{order_by}" {normalized}'
+        return f' ORDER BY "{order_by}" {normalized_order}'
 
     def _validate_aggregation_args(self, operation: str, field: Optional[str], group_by: Optional[str]) -> str:
         sql_operation = operation.upper()
@@ -124,7 +124,14 @@ class SqliteDataStore(DataStore):
             sql_query = f'SELECT {aggregation_expression} AS result FROM "{self._table_schema.table_name}"{where_clause}'
             return sql_query, params
 
-        order_clause = self._build_order_clause(order_by, order)
+        if order_by == "@result":
+            normalized_order = order.upper()
+            if normalized_order not in ("ASC", "DESC"):
+                raise ValueError(f"order must be 'asc' or 'desc', got: {order!r}")
+            order_clause = f' ORDER BY result {normalized_order}'
+        else:
+            order_clause = self._build_order_clause(order_by, order)
+
         sql_query = (
             f'SELECT "{group_by}", {aggregation_expression} AS result '
             f'FROM "{self._table_schema.table_name}"{where_clause} '
