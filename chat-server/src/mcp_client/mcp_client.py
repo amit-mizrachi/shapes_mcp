@@ -1,4 +1,5 @@
 import logging
+from contextlib import AsyncExitStack
 
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
@@ -12,35 +13,37 @@ class MCPClient:
     def __init__(self, url: str):
         self._url = url
         self._session: ClientSession | None = None
-        self._streams = None
+        self._exit_stack: AsyncExitStack | None = None
 
     async def __aenter__(self) -> "MCPClient":
-        self._streams = streamablehttp_client(self._url)
-        read, write, _ = await self._streams.__aenter__()
+        stack = AsyncExitStack()
         try:
-            self._session = ClientSession(read, write)
-            await self._session.__aenter__()
+            read, write, _ = await stack.enter_async_context(
+                streamablehttp_client(self._url)
+            )
+            self._session = await stack.enter_async_context(
+                ClientSession(read, write)
+            )
             await self._session.initialize()
         except Exception:
-            await self._streams.__aexit__(None, None, None)
-            self._streams = None
+            await stack.aclose()
             raise
+        self._exit_stack = stack
         return self
 
     async def __aexit__(self, *exc_info) -> None:
-        try:
-            if self._session:
-                await self._session.__aexit__(*exc_info)
-        except Exception:
-            logger.debug("Error closing MCP session", exc_info=True)
-        finally:
+        self._session = None
+        if self._exit_stack:
             try:
-                if self._streams:
-                    await self._streams.__aexit__(*exc_info)
+                await self._exit_stack.__aexit__(*exc_info)
             except Exception:
-                logger.debug("Error closing MCP streams", exc_info=True)
+                logger.debug("Error closing MCP resources", exc_info=True)
+            finally:
+                self._exit_stack = None
 
     async def list_tools(self) -> list[dict]:
+        if self._session is None:
+            raise RuntimeError("MCPClient must be used as an async context manager")
         result = await self._session.list_tools()
         return [
             {
@@ -52,6 +55,8 @@ class MCPClient:
         ]
 
     async def call_tool(self, name: str, arguments: dict) -> str:
+        if self._session is None:
+            raise RuntimeError("MCPClient must be used as an async context manager")
         result = await self._session.call_tool(name, arguments)
         parts = []
         for content in result.content:

@@ -108,3 +108,45 @@ class TestMCPClient:
                 tools = await client.list_tools()
 
         assert tools == []
+
+    async def test_enter_cleans_up_streams_on_session_failure(self, mock_streams):
+        failing_session = AsyncMock()
+        failing_session.__aenter__ = AsyncMock(return_value=failing_session)
+        failing_session.__aexit__ = AsyncMock(return_value=False)
+        failing_session.initialize = AsyncMock(side_effect=RuntimeError("init failed"))
+
+        with patch("mcp_client.mcp_client.streamablehttp_client", return_value=mock_streams), \
+             patch("mcp_client.mcp_client.ClientSession", return_value=failing_session):
+            with pytest.raises(RuntimeError, match="init failed"):
+                async with MCPClient("http://localhost:3001/mcp"):
+                    pass
+
+        mock_streams.__aexit__.assert_called()
+
+    async def test_exit_handles_session_close_error(self, mock_streams, mock_session):
+        mock_session.__aexit__ = AsyncMock(side_effect=OSError("session close failed"))
+
+        with patch("mcp_client.mcp_client.streamablehttp_client", return_value=mock_streams), \
+             patch("mcp_client.mcp_client.ClientSession", return_value=mock_session):
+            async with MCPClient("http://localhost:3001/mcp"):
+                pass  # __aexit__ should not propagate the session close error
+
+        mock_streams.__aexit__.assert_called()
+
+    async def test_exit_handles_streams_close_error(self, mock_streams, mock_session):
+        mock_streams.__aexit__ = AsyncMock(side_effect=OSError("streams close failed"))
+
+        with patch("mcp_client.mcp_client.streamablehttp_client", return_value=mock_streams), \
+             patch("mcp_client.mcp_client.ClientSession", return_value=mock_session):
+            async with MCPClient("http://localhost:3001/mcp"):
+                pass  # __aexit__ should swallow the streams close error
+
+    async def test_list_tools_outside_context_raises(self):
+        client = MCPClient("http://localhost:3001/mcp")
+        with pytest.raises(RuntimeError, match="must be used as an async context manager"):
+            await client.list_tools()
+
+    async def test_call_tool_outside_context_raises(self):
+        client = MCPClient("http://localhost:3001/mcp")
+        with pytest.raises(RuntimeError, match="must be used as an async context manager"):
+            await client.call_tool("test", {})
