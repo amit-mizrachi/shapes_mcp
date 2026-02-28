@@ -27,8 +27,6 @@ class SqliteQueryBuilder:
         self._table_schema = table_schema
         self._valid_columns: set[str] = {column.name for column in table_schema.columns}
 
-    # ── public API ──────────────────────────────────────────────────
-
     def build_select(
         self,
         *,
@@ -107,8 +105,6 @@ class SqliteQueryBuilder:
         )
 
         return AggregateQuery(sql=sql, params=params)
-
-    # ── callees of build_select (in call order) ─────────────────────
 
     def _build_select_columns(self, fields: Optional[list[str]]) -> str:
         if not fields:
@@ -258,8 +254,6 @@ class SqliteQueryBuilder:
         )
         all_params = list(params) + (having_params or []) + [limit]
         return sql_query, all_params
-
-    # ── shared leaf helpers ─────────────────────────────────────────
 
     def _validate_column(self, column: str) -> None:
         if column not in self._valid_columns:

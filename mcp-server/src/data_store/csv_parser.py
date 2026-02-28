@@ -19,8 +19,9 @@ class CSVParser:
         raw_columns, rows = CSVParser._read_csv(csv_path)
         sanitized_columns = CSVParser._sanitize_column_names(raw_columns)
         table_name = CSVParser.path_to_table_name(csv_path)
-        columns = CSVParser._detect_column_types(raw_columns, sanitized_columns, rows)
-        sanitized_rows = CSVParser._rekey_rows(raw_columns, sanitized_columns, rows)
+        columns, sanitized_rows = CSVParser._detect_types_and_rekey(
+            raw_columns, sanitized_columns, rows,
+        )
 
         return ParsedCSV(
             table_name=table_name,
@@ -38,11 +39,13 @@ class CSVParser:
                     raise ValueError(f"CSV file {csv_path} has no headers")
                 rows = list(reader)
         except FileNotFoundError:
-            logger.error("CSV file not found: %s", csv_path)
-            raise ValueError(f"CSV file not found: {csv_path}") from None
+            message = f"CSV file not found: {csv_path}"
+            logger.error(message)
+            raise ValueError(message) from None
         except PermissionError:
-            logger.error("Permission denied reading CSV: %s", csv_path)
-            raise ValueError(f"Permission denied reading CSV: {csv_path}") from None
+            message = f"Permission denied reading CSV: {csv_path}"
+            logger.error(message)
+            raise ValueError(message) from None
 
         if not rows:
             raise ValueError(f"CSV file {csv_path} has no data rows")
@@ -66,17 +69,53 @@ class CSVParser:
         return CSVParser._sanitize_identifier(basename) or "data"
 
     @staticmethod
-    def _detect_column_types(
+    def _detect_types_and_rekey(
         raw_columns: list[str],
         sanitized_columns: list[str],
         rows: list[dict],
-    ) -> list[ColumnInfo]:
-        columns: list[ColumnInfo] = []
-        for original, sanitized in zip(raw_columns, sanitized_columns):
-            values = [row[original] for row in rows]
-            detected = CSVParser.detect_column_type(values)
-            columns.append(ColumnInfo(name=sanitized, detected_type=detected, samples=values[:_MAX_SAMPLE_VALUES]))
-        return columns
+    ) -> tuple[list[ColumnInfo], list[dict]]:
+        """Detect column types and rekey rows in a single pass over the data."""
+        num_columns = len(raw_columns)
+        numeric_counts = [0] * num_columns
+        totals = [0] * num_columns
+        samples: list[list[str]] = [[] for _ in range(num_columns)]
+        sanitized_rows: list[dict] = []
+
+        for row in rows:
+            new_row = {}
+            for column_index in range(num_columns):
+                value = row[raw_columns[column_index]]
+                new_row[sanitized_columns[column_index]] = value
+
+                stripped = value.strip()
+                if stripped:
+                    totals[column_index] += 1
+                    try:
+                        float(stripped)
+                        numeric_counts[column_index] += 1
+                    except ValueError:
+                        pass
+
+                if len(samples[column_index]) < _MAX_SAMPLE_VALUES:
+                    samples[column_index].append(value)
+
+            sanitized_rows.append(new_row)
+
+        numeric_threshold = Config.get("mcp_server.numeric_threshold")
+        columns = []
+        for column_index in range(num_columns):
+            total = totals[column_index]
+            if total == 0:
+                detected_type = "text"
+            else:
+                detected_type = "numeric" if numeric_counts[column_index] / total > numeric_threshold else "text"
+            columns.append(ColumnInfo(
+                name=sanitized_columns[column_index],
+                detected_type=detected_type,
+                samples=samples[column_index],
+            ))
+
+        return columns, sanitized_rows
 
     @staticmethod
     def detect_column_type(values: list[str]) -> str:
@@ -95,8 +134,3 @@ class CSVParser:
         if total == 0:
             return "text"
         return "numeric" if numeric_count / total > Config.get("mcp_server.numeric_threshold") else "text"
-
-    @staticmethod
-    def _rekey_rows(raw_columns: list[str], sanitized_columns: list[str], rows: list[dict]) -> list[dict]:
-        column_name_map = dict(zip(raw_columns, sanitized_columns))
-        return [{column_name_map[key]: value for key, value in row.items()} for row in rows]

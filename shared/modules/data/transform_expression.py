@@ -42,11 +42,11 @@ class TransformExpression(ShapesBaseModel):
     """
     model_config = ConfigDict(frozen=True)
 
-    source_column: str = Field(description="The numeric column to transform (e.g. 'salary_amount').")
+    source_column: str = Field(description="The numeric column to transform.")
     cases: list[TransformCase] = Field(description="List of conditional branches. Each applies a multiplier or constant when its conditions match.")
     else_multiply: float | None = Field(default=None, description="Default multiplier when no case matches (e.g. 1 to keep the value unchanged).")
     else_value: float | None = Field(default=None, description="Default constant when no case matches.")
-    alias: str = Field(description="Name for the computed column in results (e.g. 'annual_salary_usd').")
+    alias: str = Field(description="Name for the computed column in results.")
 
     @model_validator(mode="after")
     def _validate(self) -> TransformExpression:

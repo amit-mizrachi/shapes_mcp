@@ -32,9 +32,10 @@ class SqliteIngester(DataIngestor):
 
     def _insert_rows(self, connection: sqlite3.Connection, parsed_csv: ParsedCSV) -> None:
         column_types = {column.name: column.detected_type for column in parsed_csv.columns}
-        placeholders = ", ".join("?" for _ in parsed_csv.headers)
+        headers = parsed_csv.headers
+        placeholders = ", ".join("?" for _ in headers)
         rows_as_values = (
-            [self._to_sql_value(row[header], column_types[header]) for header in parsed_csv.headers]
+            [self._to_sql_value(row[header], column_types[header]) for header in headers]
             for row in parsed_csv.rows
         )
         connection.cursor().executemany(
