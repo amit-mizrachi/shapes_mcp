@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { sendMessage } from "../api/chat";
-import type { Message } from "../types";
+import type { Message, ToolCallEvent } from "../types";
 
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -20,13 +20,13 @@ export function useChat() {
         );
         const response = await sendMessage(apiMessages);
 
+        const toolCalls: ToolCallEvent[] | undefined =
+          response.tool_calls?.length > 0 ? response.tool_calls : undefined;
+
         const assistantMessage: Message = {
           role: "assistant",
           content: response.answer,
-          toolCalls:
-            response.tool_calls?.length > 0
-              ? response.tool_calls
-              : undefined,
+          toolCalls,
         };
         setMessages((prev) => [...prev, assistantMessage]);
       } catch (err) {

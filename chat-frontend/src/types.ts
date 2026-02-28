@@ -1,14 +1,17 @@
 export type Role = "user" | "assistant";
 
-export interface ToolCall {
-  tool: string;
-  arguments: Record<string, unknown>;
+export interface ToolCallEvent {
+  status: "success" | "error" | "malformed";
+  tool: string | null;
+  arguments: Record<string, unknown> | null;
+  error_message: string | null;
+  retry_attempt: number | null;
 }
 
 export interface Message {
   role: Role;
   content: string;
-  toolCalls?: ToolCall[];
+  toolCalls?: ToolCallEvent[];
 }
 
 export interface ChatRequest {
@@ -17,5 +20,5 @@ export interface ChatRequest {
 
 export interface ChatResponse {
   answer: string;
-  tool_calls: ToolCall[];
+  tool_calls: ToolCallEvent[];
 }

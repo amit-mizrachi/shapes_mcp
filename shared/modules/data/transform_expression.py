@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from pydantic import ConfigDict, model_validator
+from pydantic import ConfigDict, Field, model_validator
 
 from shared.modules.shapes_base_model import ShapesBaseModel
 from shared.modules.data.filter_condition import FilterCondition
@@ -13,11 +13,12 @@ _MAX_CONSTANT = 1_000_000
 
 
 class TransformCase(ShapesBaseModel):
+    """A single CASE WHEN branch: when conditions match, apply a multiplier or constant."""
     model_config = ConfigDict(frozen=True)
 
-    when: list[FilterCondition]
-    then_multiply: float | None = None
-    then_value: float | None = None
+    when: list[FilterCondition] = Field(description="Conditions that must all match for this case to apply.")
+    then_multiply: float | None = Field(default=None, description="Multiply the source column by this factor when conditions match.")
+    then_value: float | None = Field(default=None, description="Replace the source column with this constant when conditions match.")
 
     @model_validator(mode="after")
     def _validate(self) -> TransformCase:
@@ -35,13 +36,17 @@ class TransformCase(ShapesBaseModel):
 
 
 class TransformExpression(ShapesBaseModel):
+    """Compute a derived column using conditional math (CASE WHEN logic) before aggregating or selecting.
+
+    Use this to normalize mixed units, currencies, or categories into a single comparable value.
+    """
     model_config = ConfigDict(frozen=True)
 
-    source_column: str
-    cases: list[TransformCase]
-    else_multiply: float | None = None
-    else_value: float | None = None
-    alias: str
+    source_column: str = Field(description="The numeric column to transform (e.g. 'salary_amount').")
+    cases: list[TransformCase] = Field(description="List of conditional branches. Each applies a multiplier or constant when its conditions match.")
+    else_multiply: float | None = Field(default=None, description="Default multiplier when no case matches (e.g. 1 to keep the value unchanged).")
+    else_value: float | None = Field(default=None, description="Default constant when no case matches.")
+    alias: str = Field(description="Name for the computed column in results (e.g. 'annual_salary_usd').")
 
     @model_validator(mode="after")
     def _validate(self) -> TransformExpression:

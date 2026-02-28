@@ -231,14 +231,72 @@ body {
   color: var(--color-text);
 }
 
-.tool-trace-list {
-  list-style: none;
-  padding: 0;
+/* ── Timeline ── */
+.tool-timeline {
   margin-top: 8px;
 }
 
-.tool-trace-item {
-  margin-bottom: 8px;
+.timeline-event {
+  display: flex;
+  gap: 10px;
+  min-height: 32px;
+}
+
+.timeline-event--last .timeline-line {
+  display: none;
+}
+
+.timeline-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 14px;
+  flex-shrink: 0;
+}
+
+.timeline-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 5px;
+}
+
+.timeline-dot--success {
+  background: var(--color-primary);
+}
+
+.timeline-dot--error {
+  background: var(--color-error);
+}
+
+.timeline-line {
+  width: 2px;
+  flex: 1;
+  background: var(--color-border);
+  margin-top: 2px;
+}
+
+.timeline-content {
+  flex: 1;
+  padding-bottom: 12px;
+  min-width: 0;
+}
+
+.timeline-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.timeline-header:disabled {
+  cursor: default;
 }
 
 .tool-name {
@@ -246,6 +304,38 @@ body {
   font-weight: 600;
   font-family: var(--font-mono);
   color: var(--color-primary);
+}
+
+.tool-name--error {
+  color: var(--color-error);
+}
+
+.timeline-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.timeline-badge--error {
+  background: var(--color-error-bg);
+  color: var(--color-error);
+}
+
+.timeline-badge--malformed {
+  background: var(--color-error-bg);
+  color: var(--color-error);
+}
+
+.timeline-retry {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+.timeline-detail {
+  margin-top: 4px;
 }
 
 .tool-args {
@@ -257,6 +347,12 @@ body {
   margin-top: 4px;
   overflow-x: auto;
   white-space: pre-wrap;
+}
+
+.timeline-error-msg {
+  font-size: 0.75rem;
+  color: var(--color-error);
+  margin-top: 4px;
 }
 
 /* ── Chat input ── */

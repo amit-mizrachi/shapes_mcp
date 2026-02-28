@@ -163,8 +163,15 @@ class GeminiLLMClient(LLMClient):
         if not candidate or not candidate.content or not candidate.content.parts:
             finish_reason = getattr(candidate, 'finish_reason', None)
             if finish_reason and "MALFORMED_FUNCTION_CALL" in str(finish_reason):
-                logger.warning("Gemini produced a malformed function call")
-                return LLMResponse(text="Sorry, I had trouble formatting my response. Please try again.")
+                finish_message = getattr(candidate, "finish_message", None)
+                logger.warning("Gemini produced a malformed function call (finish_reason=%s, message=%s)",
+                    finish_reason,
+                    finish_message,
+                )
+                return LLMResponse(
+                    malformed_function_call=True,
+                    malformed_message=finish_message,
+                )
             raise RuntimeError(
                 "Gemini returned no usable content — response may have been blocked. "
                 f"Finish reason: {finish_reason}, "

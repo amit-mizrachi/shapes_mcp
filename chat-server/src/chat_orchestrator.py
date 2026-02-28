@@ -5,10 +5,19 @@ from mcp_client.mcp_client_manager import MCPClientManager
 from shared.config import Config
 from shared.modules.api.chat_request import ChatRequest
 from shared.modules.api.chat_response import ChatResponse
+from shared.modules.api.tool_call_event import ToolCallEvent, ToolCallEventStatus
 from shared.modules.llm.llm_response import LLMResponse
 from shared.modules.llm.tool_call import ToolCall
 
 logger = logging.getLogger(__name__)
+
+_MAX_MALFORMED_RETRIES = 2
+_MALFORMED_RETRY_HINT = (
+    "Your previous function call was malformed and could not be parsed. "
+    "Please try again with a simpler structure. If the query requires a "
+    "transform parameter, make sure to follow the exact JSON structure "
+    "from the tool description."
+)
 
 
 class ChatOrchestrator:
@@ -25,10 +34,29 @@ class ChatOrchestrator:
     async def execute(self, request: ChatRequest) -> ChatResponse:
         messages = self._build_initial_messages(request)
         tools = self._mcp_manager.get_tools()
-        tool_call_history: list[dict] = []
+        tool_call_history: list[ToolCallEvent] = []
+        malformed_retries = 0
 
         for _ in range(self._max_iterations):
             llm_response = await self._llm_client.invoke(messages, tools)
+
+            if llm_response.malformed_function_call:
+                malformed_retries += 1
+                tool_call_history.append(ToolCallEvent(
+                    status=ToolCallEventStatus.MALFORMED,
+                    error_message=llm_response.malformed_message,
+                    retry_attempt=malformed_retries,
+                ))
+                if malformed_retries > _MAX_MALFORMED_RETRIES:
+                    logger.warning("Exceeded max malformed function call retries (%d)", _MAX_MALFORMED_RETRIES)
+                    return ChatResponse(
+                        answer="I was unable to format a valid tool call for this query. "
+                               "Please try rephrasing your question or breaking it into simpler parts.",
+                        tool_calls=tool_call_history,
+                    )
+                logger.info("Retrying after malformed function call (attempt %d/%d)", malformed_retries, _MAX_MALFORMED_RETRIES)
+                messages.append({"role": "user", "content": _MALFORMED_RETRY_HINT})
+                continue
 
             if not llm_response.tool_calls:
                 return ChatResponse(
@@ -65,11 +93,17 @@ class ChatOrchestrator:
             })
         return {"role": "assistant", "content": content}
 
-    async def _execute_tool_calls(self, tool_calls: list[ToolCall], tool_call_history: list[dict]) -> list[dict]:
+    async def _execute_tool_calls(self, tool_calls: list[ToolCall], tool_call_history: list[ToolCallEvent]) -> list[dict]:
         tool_results: list[dict] = []
         for tool_call in tool_calls:
-            tool_call_history.append({"tool": tool_call.name, "arguments": tool_call.arguments})
             result = await self._call_single_tool(tool_call)
+            is_error = result.get("is_error", False)
+            tool_call_history.append(ToolCallEvent(
+                status=ToolCallEventStatus.ERROR if is_error else ToolCallEventStatus.SUCCESS,
+                tool=tool_call.name,
+                arguments=tool_call.arguments,
+                error_message=result.get("content") if is_error else None,
+            ))
             tool_results.append(result)
         return tool_results
 
