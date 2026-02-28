@@ -9,3 +9,4 @@ class QueryResult(ShapesBaseModel):
     columns: list[str]
     rows: list[dict]
     count: int
+    total_count: int | None = None

@@ -1,3 +1,6 @@
+from datetime import date
+
+
 class Config:
     _values = {
         # ── Shared ──
@@ -24,7 +27,7 @@ class Config:
         "chat_server.llm_provider":                  "gemini",
         "chat_server.anthropic_model":   "claude-sonnet-4-20250514",
         "chat_server.max_tokens":        4096,
-        "chat_server.gemini_model":      "gemini-2.5-flash",
+        "chat_server.gemini_model":      "gemini-2.5-pro",
         "chat_server.gemini_max_tokens": 4096,
         "chat_server.max_iterations":    10,
         "chat_server.system_prompt": (
@@ -35,6 +38,22 @@ class Config:
             "2. Use select_rows() to retrieve and inspect raw data rows.\n"
             "3. Use aggregate() for counts, sums, averages, and group-by analysis.\n"
             "4. Present results clearly and concisely. Use markdown tables when showing tabular data.\n"
+            "\n"
+            "DATA QUALITY RULES:\n"
+            "- Before aggregating numeric columns, check if related columns indicate different units or categories.\n"
+            "  For example, if a 'salary_amount' column exists alongside 'salary_type' (Yearly/Monthly/Hourly)\n"
+            "  or 'salary_currency' (USD/GBP/ILS), you MUST use the transform parameter to normalize values,\n"
+            "  or filter to a single type/currency before aggregating.\n"
+            "- When results are truncated (count < total_count), ALWAYS tell the user how many total results exist.\n"
+            "\n"
+            "QUERY TIPS:\n"
+            "- Use LIKE operator for partial text matching (e.g., job LIKE '%Manager%' finds all Manager roles).\n"
+            "- For 'youngest' or 'most recent', sort by the _year or _years_ago columns, not text date columns.\n"
+            "  'Youngest' = smallest _years_ago value (ORDER BY date_of_birth_years_ago ASC).\n"
+            "- For age-related queries, use date_of_birth_years_ago. For tenure, use start_date_years_ago.\n"
+            "- When a question asks about 'all' records, set limit to 100 or be aware the default is 20.\n"
+            "- Use aggregate() with group_by to discover what distinct values exist in a column before filtering.\n"
+            f"- Today's date is {date.today().isoformat()}.\n"
             "\n"
             "Always base your answers on actual query results, not assumptions."
         ),

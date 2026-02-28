@@ -89,6 +89,7 @@ class TestSelectRows:
         mock_store.select_rows.assert_called_once_with(
             filters=None, fields=["name"], limit=5,
             order_by=None, order="asc", distinct=False,
+            transform=None, filter_logic="AND",
         )
 
 

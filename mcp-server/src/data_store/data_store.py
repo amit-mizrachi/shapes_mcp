@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from shared.modules.data.filter_condition import FilterCondition
 from shared.modules.data.table_schema import TableSchema
 from shared.modules.data.query_result import QueryResult
+from shared.modules.data.transform_expression import TransformExpression
 
 
 class DataStore(ABC):
@@ -20,6 +21,8 @@ class DataStore(ABC):
         order_by: str | None = None,
         order: str = "asc",
         distinct: bool = False,
+        transform: TransformExpression | None = None,
+        filter_logic: str = "AND",
     ) -> QueryResult: ...
 
     @abstractmethod
@@ -27,9 +30,13 @@ class DataStore(ABC):
         self,
         operation: str,
         field: str | None = None,
-        group_by: str | None = None,
+        group_by: str | list[str] | None = None,
         filters: list[FilterCondition] | None = None,
         limit: int = 20,
         order_by: str | None = None,
         order: str = "desc",
+        having_operator: str | None = None,
+        having_value: float | None = None,
+        transform: TransformExpression | None = None,
+        filter_logic: str = "AND",
     ) -> QueryResult: ...

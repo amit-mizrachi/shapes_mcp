@@ -159,16 +159,22 @@ class GeminiLLMClient(LLMClient):
 
     def _parse_response(self, response) -> LLMResponse:
         """Extract text and tool calls from Gemini's response candidates."""
-        if not response.candidates:
+        candidate = response.candidates[0] if response.candidates else None
+        if not candidate or not candidate.content or not candidate.content.parts:
+            finish_reason = getattr(candidate, 'finish_reason', None)
+            if finish_reason and "MALFORMED_FUNCTION_CALL" in str(finish_reason):
+                logger.warning("Gemini produced a malformed function call")
+                return LLMResponse(text="Sorry, I had trouble formatting my response. Please try again.")
             raise RuntimeError(
-                "Gemini returned no candidates — response may have been blocked. "
+                "Gemini returned no usable content — response may have been blocked. "
+                f"Finish reason: {finish_reason}, "
                 f"Prompt feedback: {response.prompt_feedback}"
             )
 
         text_segments: list[str] = []
         tool_calls: list[ToolCall] = []
 
-        for part in response.candidates[0].content.parts:
+        for part in candidate.content.parts:
             if part.text:
                 text_segments.append(part.text)
             elif part.function_call:
