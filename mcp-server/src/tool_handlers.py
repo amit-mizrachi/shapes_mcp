@@ -8,7 +8,7 @@ from shared.config import Config
 from shared.modules.data.filter_condition import FilterCondition
 from shared.modules.data.transform_expression import TransformExpression
 from shared.modules.data.query_result import QueryResult
-from data_store.data_store import DataStore
+from data_store.interfaces.data_store import DataStore
 
 logger = logging.getLogger(__name__)
 

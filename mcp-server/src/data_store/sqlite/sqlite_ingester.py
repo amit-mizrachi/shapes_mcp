@@ -3,7 +3,7 @@ import sqlite3
 from shared.config import Config
 from shared.modules.data.parsed_csv import ParsedCSV
 from shared.modules.data.table_schema import TableSchema
-from data_store.data_ingestor import DataIngestor
+from data_store.interfaces.data_ingestor import DataIngestor
 
 
 class SqliteIngester(DataIngestor):

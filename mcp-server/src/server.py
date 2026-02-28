@@ -12,8 +12,8 @@ from enrichment.rules.nominal_date_rule import NominalDateRule
 from enrichment.rules.month_extraction_rule import MonthExtractionRule
 from enrichment.rules.year_extraction_rule import YearExtractionRule
 from data_store.csv_parser import CSVParser
-from data_store.data_ingestor import DataIngestor
-from data_store.data_store import DataStore
+from data_store.interfaces.data_ingestor import DataIngestor
+from data_store.interfaces.data_store import DataStore
 from data_store.sqlite_ingester import SqliteIngester
 from data_store.sqlite_data_store import SqliteDataStore
 from shared.config import Config

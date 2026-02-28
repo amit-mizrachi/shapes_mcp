@@ -12,7 +12,7 @@ from shared.modules.data.filter_condition import FilterCondition
 from shared.modules.data.query_result import QueryResult
 from shared.modules.data.table_schema import TableSchema
 from shared.modules.data.transform_expression import TransformExpression
-from data_store.data_store import DataStore
+from data_store.interfaces.data_store import DataStore
 from data_store.sqlite_query_builder import SqliteQueryBuilder
 
 logger = logging.getLogger(__name__)

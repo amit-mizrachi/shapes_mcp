@@ -438,8 +438,10 @@ Every step is independently deployable. No step changes runtime behavior.
 # Before:
 class SqliteIngester:
 
+
 # After:
-from data_store.data_ingestor import DataIngestor
+from data_store.interfaces.data_ingestor import DataIngestor
+
 
 class SqliteIngester(DataIngestor):
 ```
