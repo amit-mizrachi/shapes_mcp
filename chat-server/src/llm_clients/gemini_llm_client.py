@@ -1,5 +1,6 @@
 import copy
 import logging
+from typing import Optional
 from uuid import uuid4
 
 from google import genai
@@ -25,7 +26,7 @@ class GeminiLLMClient(LLMClient):
         response = await self._send_request(system_instruction, contents, tools)
         return self._parse_response(response)
 
-    def _convert_messages(self, messages: list[dict]) -> tuple[str | None, list[types.Content]]:
+    def _convert_messages(self, messages: list[dict]) -> tuple[Optional[str], list[types.Content]]:
         """Separate the system instruction and translate messages to Gemini's format."""
         system_instruction = None
         contents: list[types.Content] = []
@@ -101,7 +102,7 @@ class GeminiLLMClient(LLMClient):
     # ── Schema sanitization ──────────────────────────────────────────────
 
     @staticmethod
-    def _sanitize_schema(schema: dict | None) -> dict | None:
+    def _sanitize_schema(schema: Optional[dict]) -> Optional[dict]:
         """Resolve $ref/$defs and strip keys unsupported by Gemini."""
         if not schema:
             return schema

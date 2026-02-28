@@ -69,6 +69,15 @@ class TestInferDerivedColumns:
         assert "dob_month" in names
         assert "dob_year" in names
 
+    def test_does_not_overwrite_existing_column_data(self, rule):
+        cols = _cols(("dob", "text"), ("dob_days", "numeric"))
+        rows = [{"dob": "28/01/1977", "dob_days": 999}]
+        rule.infer_derived_columns(cols, rows)
+        result = rule.add_derived_columns(rows)
+        assert result[0]["dob_days"] == 999
+        assert result[0]["dob_month"] == 1
+        assert result[0]["dob_year"] == 1977
+
 
 class TestAddDerivedColumns:
     def test_computes_days_since_epoch(self, rule):

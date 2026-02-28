@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import ConfigDict
 
 from shared.modules.shapes_base_model import ShapesBaseModel
@@ -9,4 +11,4 @@ class QueryResult(ShapesBaseModel):
     columns: list[str]
     rows: list[dict]
     count: int
-    total_count: int | None = None
+    total_count: Optional[int] = None

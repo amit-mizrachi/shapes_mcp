@@ -1,6 +1,7 @@
 """Chat server test fixtures: mock LLM, mock MCP manager, orchestrator."""
 
 from contextlib import asynccontextmanager
+from typing import Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -45,9 +46,9 @@ def mock_mcp_manager(mock_mcp_client):
 
 
 def make_llm_response_with_tool_call(
-    text: str | None = None,
+    text: Optional[str] = None,
     tool_name: str = "get_schema",
-    tool_args: dict | None = None,
+    tool_args: Optional[dict] = None,
     tool_id: str = "tc_1",
 ) -> LLMResponse:
     """Helper to create an LLMResponse with a single tool call."""

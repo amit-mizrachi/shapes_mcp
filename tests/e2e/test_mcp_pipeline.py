@@ -6,8 +6,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from data_store.csv_parser import CSVParser
-from data_store.sqlite_ingester import SqliteIngester
-from data_store.sqlite_data_store import SqliteDataStore
+from data_store.sqlite.sqlite_ingester import SqliteIngester
+from data_store.sqlite.sqlite_data_store import SqliteDataStore
 from shared.modules.data.filter_condition import FilterCondition
 import tool_handlers
 

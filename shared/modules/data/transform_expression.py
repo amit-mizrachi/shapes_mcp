@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from typing import Optional
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -17,8 +18,8 @@ class TransformCase(ShapesBaseModel):
     model_config = ConfigDict(frozen=True)
 
     when: list[FilterCondition] = Field(description="Conditions that must all match for this case to apply.")
-    then_multiply: float | None = Field(default=None, description="Multiply the source column by this factor when conditions match.")
-    then_value: float | None = Field(default=None, description="Replace the source column with this constant when conditions match.")
+    then_multiply: Optional[float] = Field(default=None, description="Multiply the source column by this factor when conditions match.")
+    then_value: Optional[float] = Field(default=None, description="Replace the source column with this constant when conditions match.")
 
     @model_validator(mode="after")
     def _validate(self) -> TransformCase:
@@ -44,8 +45,8 @@ class TransformExpression(ShapesBaseModel):
 
     source_column: str = Field(description="The numeric column to transform.")
     cases: list[TransformCase] = Field(description="List of conditional branches. Each applies a multiplier or constant when its conditions match.")
-    else_multiply: float | None = Field(default=None, description="Default multiplier when no case matches (e.g. 1 to keep the value unchanged).")
-    else_value: float | None = Field(default=None, description="Default constant when no case matches.")
+    else_multiply: Optional[float] = Field(default=None, description="Default multiplier when no case matches (e.g. 1 to keep the value unchanged).")
+    else_value: Optional[float] = Field(default=None, description="Default constant when no case matches.")
     alias: str = Field(description="Name for the computed column in results.")
 
     @model_validator(mode="after")

@@ -1,6 +1,7 @@
 """Tests for chat-server/src/llm_clients/gemini/gemini_llm_client.py — tool conversion, message conversion, invoke."""
 
 from types import SimpleNamespace
+from typing import Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -23,7 +24,7 @@ def _text_part(text: str):
     return SimpleNamespace(text=text, function_call=None)
 
 
-def _fc_part(name: str, args: dict, id: str | None = None):
+def _fc_part(name: str, args: dict, id: Optional[str] = None):
     return SimpleNamespace(
         text=None,
         function_call=SimpleNamespace(id=id, name=name, args=args),

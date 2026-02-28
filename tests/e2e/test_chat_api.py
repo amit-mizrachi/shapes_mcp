@@ -10,8 +10,8 @@ from httpx import ASGITransport, AsyncClient
 from shared.modules.llm.llm_response import LLMResponse
 from shared.modules.llm.tool_call import ToolCall
 from data_store.csv_parser import CSVParser
-from data_store.sqlite_ingester import SqliteIngester
-from data_store.sqlite_data_store import SqliteDataStore
+from data_store.sqlite.sqlite_ingester import SqliteIngester
+from data_store.sqlite.sqlite_data_store import SqliteDataStore
 
 
 @pytest.fixture()

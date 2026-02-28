@@ -1,6 +1,4 @@
-"""Tests for mcp-server/src/data_store/sqlite_data_store.py — async queries, validation, SQL safety."""
-
-import sqlite3
+"""Tests for mcp-server/src/data_store/sqlite/sqlite_data_store.py — async queries, validation, SQL safety."""
 
 import pytest
 from pydantic import ValidationError
@@ -9,8 +7,8 @@ from shared.modules.data.filter_condition import FilterCondition
 from shared.modules.data.table_schema import TableSchema
 from shared.modules.data.transform_expression import TransformExpression
 from data_store.csv_parser import CSVParser
-from data_store.sqlite_data_store import SqliteDataStore
-from data_store.sqlite_ingester import SqliteIngester
+from data_store.sqlite.sqlite_data_store import SqliteDataStore
+from data_store.sqlite.sqlite_ingester import SqliteIngester
 
 
 @pytest.fixture()

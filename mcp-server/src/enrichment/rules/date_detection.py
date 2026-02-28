@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Optional
 
 from shared.modules.data.column_info import ColumnInfo
 
@@ -30,7 +31,7 @@ def detect_date_columns(
     return result
 
 
-def _detect_date_format(column_name: str, sample_rows: list[dict]) -> str | None:
+def _detect_date_format(column_name: str, sample_rows: list[dict]) -> Optional[str]:
     values = [
         str(row.get(column_name, "")).strip()
         for row in sample_rows

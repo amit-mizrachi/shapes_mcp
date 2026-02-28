@@ -1,6 +1,7 @@
 import json
 import logging
 from datetime import date
+from typing import Optional, Union
 
 from mcp.server.fastmcp import Context
 
@@ -84,13 +85,13 @@ async def get_schema(context: Context) -> str:
     )
 
 async def select_rows(
-    filters: list[FilterCondition] | None = None,
-    fields: list[str] | None = None,
+    filters: Optional[list[FilterCondition]] = None,
+    fields: Optional[list[str]] = None,
     limit: int = Config.get("mcp_server.default_query_limit"),
-    order_by: str | None = None,
+    order_by: Optional[str] = None,
     order: str = "asc",
     distinct: bool = False,
-    transform: TransformExpression | None = None,
+    transform: Optional[TransformExpression] = None,
     filter_logic: str = "AND",
     context: Context = None,
 ) -> str:
@@ -140,15 +141,15 @@ async def select_rows(
 
 async def aggregate(
     operation: str,
-    field: str | None = None,
-    group_by: str | list[str] | None = None,
-    filters: list[FilterCondition] | None = None,
+    field: Optional[str] = None,
+    group_by: Optional[Union[str, list[str]]] = None,
+    filters: Optional[list[FilterCondition]] = None,
     limit: int = Config.get("mcp_server.default_query_limit"),
-    order_by: str | None = None,
+    order_by: Optional[str] = None,
     order: str = "desc",
-    having_operator: str | None = None,
-    having_value: float | None = None,
-    transform: TransformExpression | None = None,
+    having_operator: Optional[str] = None,
+    having_value: Optional[float] = None,
+    transform: Optional[TransformExpression] = None,
     filter_logic: str = "AND",
     context: Context = None,
 ) -> str:

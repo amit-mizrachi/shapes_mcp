@@ -1,4 +1,5 @@
 import sqlite3
+from typing import Optional, Union
 
 from shared.config import Config
 from shared.modules.data.parsed_csv import ParsedCSV
@@ -7,7 +8,7 @@ from data_store.interfaces.data_ingestor import DataIngestor
 
 
 class SqliteIngester(DataIngestor):
-    def __init__(self, database_path: str | None = None) -> None:
+    def __init__(self, database_path: Optional[str] = None) -> None:
         self._db_uri = database_path or Config.get("mcp_server.db_path")
 
     def ingest(self, parsed_csv: ParsedCSV) -> TableSchema:
@@ -44,7 +45,7 @@ class SqliteIngester(DataIngestor):
         )
 
     @staticmethod
-    def _to_sql_value(raw_value, detected_type: str) -> float | None | str:
+    def _to_sql_value(raw_value, detected_type: str) -> Optional[Union[float, str]]:
         if raw_value is None:
             return None
         if detected_type != "numeric":

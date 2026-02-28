@@ -1,5 +1,6 @@
 import logging
 from contextlib import AsyncExitStack
+from typing import Optional
 
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
@@ -12,8 +13,8 @@ class MCPClient:
 
     def __init__(self, url: str):
         self._url = url
-        self._session: ClientSession | None = None
-        self._exit_stack: AsyncExitStack | None = None
+        self._session: Optional[ClientSession] = None
+        self._exit_stack: Optional[AsyncExitStack] = None
 
     async def __aenter__(self) -> "MCPClient":
         stack = AsyncExitStack()

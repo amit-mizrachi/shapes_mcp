@@ -5,7 +5,7 @@ import sqlite3
 import pytest
 
 from data_store.csv_parser import CSVParser
-from data_store.sqlite_ingester import SqliteIngester
+from data_store.sqlite.sqlite_ingester import SqliteIngester
 
 
 class TestSqliteIngester:

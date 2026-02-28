@@ -1,5 +1,6 @@
 import json
 import logging
+from typing import Optional
 
 import anthropic
 
@@ -24,7 +25,7 @@ class ClaudeLLMClient(LLMClient):
         response = await self._send_request(system_prompt, claude_messages, tools)
         return self._parse_response(response)
 
-    def _convert_messages(self, messages: list[dict]) -> tuple[str | None, list[dict]]:
+    def _convert_messages(self, messages: list[dict]) -> tuple[Optional[str], list[dict]]:
         """Separate the system prompt and translate messages to Claude's format."""
         system_prompt = None
         claude_messages = []
