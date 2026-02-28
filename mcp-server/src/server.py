@@ -8,8 +8,9 @@ from starlette.responses import JSONResponse
 
 import tool_handlers
 from enrichment.column_enricher import ColumnEnricher
-from enrichment.rules.date_enrichment_rule import DateEnrichmentRule
-from enrichment.rules.full_name_enrichment_rule import FullNameEnrichmentRule
+from enrichment.rules.nominal_date_rule import NominalDateRule
+from enrichment.rules.month_extraction_rule import MonthExtractionRule
+from enrichment.rules.year_extraction_rule import YearExtractionRule
 from data_store.csv_parser import CSVParser
 from data_store.sqlite_ingester import SqliteIngester
 from data_store.sqlite_data_store import SqliteDataStore
@@ -41,7 +42,7 @@ def build_data_store(csv_path: str) -> SqliteDataStore:
     parsed_csv = CSVParser.parse(csv_path)
 
     logger.info("Enriching parsed data")
-    enricher = ColumnEnricher(rules=[DateEnrichmentRule(), FullNameEnrichmentRule()])
+    enricher = ColumnEnricher(rules=[NominalDateRule(), MonthExtractionRule(), YearExtractionRule()])
     enriched_csv = enricher.enrich(parsed_csv)
 
     logger.info("Ingesting enriched data to database")

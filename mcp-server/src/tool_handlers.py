@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import date
 
 from mcp.server.fastmcp import Context
 
@@ -33,6 +34,7 @@ def _format_query_response(query_result: QueryResult) -> str:
 async def get_schema(context: Context) -> str:
     """Return the database schema: table name, column names, detected types, and sample values.
 
+    CAPABILITIES: discover table structure, column names, data types, sample values.
     Use this tool FIRST to understand what data is available before querying.
     Takes no parameters.
     """
@@ -45,9 +47,17 @@ async def get_schema(context: Context) -> str:
     if schema is None:
         logger.warning("get_schema called but no data is loaded")
         return json.dumps({"error": "No data loaded"})
+    epoch_str = Config.get("mcp_server.enrichment.nominal_date_epoch")
+    epoch = date.fromisoformat(epoch_str)
+    today_nominal = (date.today() - epoch).days
+
     return json.dumps(
         {
             "table": schema.table_name,
+            "date_context": {
+                "nominal_date_epoch": epoch_str,
+                "today_as_nominal_days": today_nominal,
+            },
             "columns": [
                 {"name": c.name, "detected_type": c.detected_type, "samples": c.samples}
                 for c in schema.columns
@@ -68,6 +78,8 @@ async def select_rows(
     context: Context = None,
 ) -> str:
     """Retrieve rows from the data table.
+
+    CAPABILITIES: row retrieval, filtering (AND/OR), sorting, distinct values, conditional value transformation (for normalizing mixed units/currencies).
 
     - fields: list of column names to return (default: all columns).
     - filters: list of filter objects. Each has:
@@ -126,6 +138,8 @@ async def aggregate(
     context: Context = None,
 ) -> str:
     """Run an aggregation on the data table.
+
+    CAPABILITIES: count/sum/avg/min/max, group-by (single or multi-column), HAVING filters, conditional value transformation (for normalizing mixed units/currencies before aggregating), sort by aggregated result (@result).
 
     - operation: one of "count", "sum", "avg", "min", "max".
     - field: column to aggregate (not required for "count", or when using transform).

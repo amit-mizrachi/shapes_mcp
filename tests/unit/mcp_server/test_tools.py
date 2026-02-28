@@ -51,6 +51,16 @@ class TestGetSchema:
         assert len(result["columns"]) == 2
         assert result["columns"][0]["name"] == "name"
 
+    async def test_includes_date_context(self):
+        mock_store = _make_mock_data_store()
+        ctx = _make_mock_ctx(mock_store)
+        result = json.loads(await tool_handlers.get_schema(ctx))
+        assert "date_context" in result
+        dc = result["date_context"]
+        assert dc["nominal_date_epoch"] == "1970-01-01"
+        assert isinstance(dc["today_as_nominal_days"], int)
+        assert dc["today_as_nominal_days"] > 0
+
     async def test_no_data_loaded(self):
         mock_store = AsyncMock()
         mock_store.get_schema = AsyncMock(return_value=None)
