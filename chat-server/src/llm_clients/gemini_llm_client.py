@@ -113,16 +113,16 @@ class GeminiLLMClient(LLMClient):
     def _resolve_refs(schema: dict) -> dict:
         """Deep-copy *schema*, inline all ``$ref`` pointers, then drop ``$defs``."""
         schema = copy.deepcopy(schema)
-        defs = schema.pop("$defs", {})
-        if not defs:
+        definitions = schema.pop("$defs", {})
+        if not definitions:
             return schema
 
         def _inline(node):
             if isinstance(node, dict):
                 if "$ref" in node:
-                    ref_path = node["$ref"]  # e.g. "#/$defs/FilterCondition"
-                    def_name = ref_path.rsplit("/", 1)[-1]
-                    resolved = copy.deepcopy(defs.get(def_name, {}))
+                    reference_path = node["$ref"]  # e.g. "#/$defs/FilterCondition"
+                    definition_name = reference_path.rsplit("/", 1)[-1]
+                    resolved = copy.deepcopy(definitions.get(definition_name, {}))
                     node.clear()
                     node.update(resolved)
                 for value in node.values():

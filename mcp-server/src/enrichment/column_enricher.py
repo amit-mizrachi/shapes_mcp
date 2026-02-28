@@ -29,7 +29,7 @@ class ColumnEnricher:
                 logger.info(
                     "Enrichment rule %s will add columns: %s",
                     rule.__class__.__name__,
-                    [c.name for c in detected],
+                    [column.name for column in detected],
                 )
 
         if not applicable_rules:
@@ -55,11 +55,11 @@ class ColumnEnricher:
         result = []
         max_samples = Config.get("mcp_server.enrichment.max_samples")
 
-        for col in columns:
+        for column in columns:
             samples = [
-                str(row[col.name])
+                str(row[column.name])
                 for row in rows[:max_samples]
-                if row.get(col.name) is not None
+                if row.get(column.name) is not None
             ]
-            result.append(ColumnInfo(name=col.name, detected_type=col.detected_type, samples=samples))
+            result.append(ColumnInfo(name=column.name, detected_type=column.detected_type, samples=samples))
         return result

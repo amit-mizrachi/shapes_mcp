@@ -15,4 +15,4 @@ class ParsedCSV(ShapesBaseModel):
 
     @property
     def headers(self) -> list[str]:
-        return [col.name for col in self.columns]
+        return [column.name for column in self.columns]

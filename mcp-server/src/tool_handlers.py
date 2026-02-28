@@ -41,26 +41,26 @@ async def get_schema(context: Context) -> str:
     try:
         data_store = _get_data_store(context)
         schema = await data_store.get_schema()
-    except Exception as e:
+    except Exception as error:
         logger.error("get_schema failed unexpectedly", exc_info=True)
-        return json.dumps({"error": f"Internal error: {e}"})
+        return json.dumps({"error": f"Internal error: {error}"})
     if schema is None:
         logger.warning("get_schema called but no data is loaded")
         return json.dumps({"error": "No data loaded"})
-    epoch_str = Config.get("mcp_server.enrichment.nominal_date_epoch")
-    epoch = date.fromisoformat(epoch_str)
+    epoch_string = Config.get("mcp_server.enrichment.nominal_date_epoch")
+    epoch = date.fromisoformat(epoch_string)
     today_nominal = (date.today() - epoch).days
 
     return json.dumps(
         {
             "table": schema.table_name,
             "date_context": {
-                "nominal_date_epoch": epoch_str,
+                "nominal_date_epoch": epoch_string,
                 "today_as_nominal_days": today_nominal,
             },
             "columns": [
-                {"name": c.name, "detected_type": c.detected_type, "samples": c.samples}
-                for c in schema.columns
+                {"name": column.name, "detected_type": column.detected_type, "samples": column.samples}
+                for column in schema.columns
             ],
         },
         indent=2,
@@ -93,11 +93,15 @@ async def select_rows(
     - order_by: column name to sort results by (or the transform alias to sort by the computed column).
     - order: "asc" or "desc" (default "asc").
     - distinct: if true, return only unique combinations of the selected fields.
-    - transform: compute a derived column using conditional math (CASE WHEN logic). Structure:
-        {"source_column": "salary_amount", "cases": [
-            {"when": [{"column": "salary_type", "value": "Monthly"}], "then_multiply": 12},
-            {"when": [{"column": "salary_type", "value": "Hourly"}], "then_multiply": 2080}
-        ], "else_multiply": 1, "alias": "annual_salary"}
+    - transform: compute a derived column using conditional math (CASE WHEN logic).
+      When a value is qualified by MULTIPLE columns (e.g., both unit and frequency), include ALL
+      qualifier columns in each case's "when" conditions — do not normalize only one dimension.
+      Structure:
+        {"source_column": "usage_amount", "cases": [
+            {"when": [{"column": "unit", "value": "gallons"}, {"column": "frequency", "value": "Daily"}], "then_multiply": 113.55},
+            {"when": [{"column": "unit", "value": "gallons"}, {"column": "frequency", "value": "Monthly"}], "then_multiply": 3.785},
+            {"when": [{"column": "unit", "value": "liters"}, {"column": "frequency", "value": "Daily"}], "then_multiply": 30}
+        ], "else_multiply": 1, "alias": "monthly_liters"}
       The computed column is added to each row. You can sort by the alias via order_by.
     - filter_logic: "AND" (default) or "OR". Controls how multiple filters are combined.
       Example: filter_logic="OR" with two filters means rows matching EITHER filter are returned.
@@ -114,12 +118,12 @@ async def select_rows(
             order_by=order_by, order=order, distinct=distinct, transform=transform,
             filter_logic=filter_logic,
         )
-    except ValueError as e:
-        logger.warning("select_rows validation error: %s", e)
-        return json.dumps({"error": str(e)})
-    except Exception as e:
+    except ValueError as error:
+        logger.warning("select_rows validation error: %s", error)
+        return json.dumps({"error": str(error)})
+    except Exception as error:
         logger.error("select_rows failed unexpectedly", exc_info=True)
-        return json.dumps({"error": f"Internal error: {e}"})
+        return json.dumps({"error": f"Internal error: {error}"})
     return _format_query_response(query_result)
 
 
@@ -160,12 +164,16 @@ async def aggregate(
       operation="count", group_by="job", having_operator=">", having_value=5.
     - transform: compute a derived value using conditional math (CASE WHEN) before aggregating.
       When using transform, the 'field' parameter is not needed — the source column is inside the transform.
-      Structure: {"source_column": "salary_amount", "cases": [
-          {"when": [{"column": "salary_type", "value": "Monthly"}], "then_multiply": 12},
-          {"when": [{"column": "salary_type", "value": "Hourly"}], "then_multiply": 2080}
-      ], "else_multiply": 1, "alias": "annual_salary"}
-      Example: to get average annual salary by city (normalizing Hourly/Monthly/Yearly):
-      operation="avg", transform={...as above...}, group_by="city", order_by="@result", order="desc".
+      When a value is qualified by MULTIPLE columns (e.g., both unit and frequency), include ALL
+      qualifier columns in each case's "when" conditions — do not normalize only one dimension.
+      Structure:
+        {"source_column": "usage_amount", "cases": [
+            {"when": [{"column": "unit", "value": "gallons"}, {"column": "frequency", "value": "Daily"}], "then_multiply": 113.55},
+            {"when": [{"column": "unit", "value": "gallons"}, {"column": "frequency", "value": "Monthly"}], "then_multiply": 3.785},
+            {"when": [{"column": "unit", "value": "liters"}, {"column": "frequency", "value": "Daily"}], "then_multiply": 30}
+        ], "else_multiply": 1, "alias": "monthly_liters"}
+      Example: to get average monthly usage by region:
+      operation="avg", transform={...as above...}, group_by="region", order_by="@result", order="desc".
     - filter_logic: "AND" (default) or "OR". Controls how multiple filters are combined.
     """
     logger.info("Executing aggregation tool")
@@ -180,12 +188,12 @@ async def aggregate(
             order_by=order_by, order=order, having_operator=having_operator, having_value=having_value,
             transform=transform, filter_logic=filter_logic,
         )
-    except ValueError as e:
-        logger.warning("aggregate validation error: %s", e)
-        return json.dumps({"error": str(e)})
-    except Exception as e:
+    except ValueError as error:
+        logger.warning("aggregate validation error: %s", error)
+        return json.dumps({"error": str(error)})
+    except Exception as error:
         logger.error("aggregate failed unexpectedly", exc_info=True)
-        return json.dumps({"error": f"Internal error: {e}"})
+        return json.dumps({"error": f"Internal error: {error}"})
     return _format_query_response(query_result)
 
 def _get_data_store(context: Context) -> DataStore:

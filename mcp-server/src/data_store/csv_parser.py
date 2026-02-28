@@ -53,7 +53,7 @@ class CSVParser:
     @staticmethod
     def _sanitize_column_names(raw_columns: list[str]) -> list[str]:
         """Sanitize raw column names into safe SQL identifiers."""
-        return [CSVParser._sanitize_identifier(col) for col in raw_columns]
+        return [CSVParser._sanitize_identifier(column_name) for column_name in raw_columns]
 
     @staticmethod
     def _sanitize_identifier(raw_name: str) -> str:
@@ -99,4 +99,4 @@ class CSVParser:
     @staticmethod
     def _rekey_rows(raw_columns: list[str], sanitized_columns: list[str], rows: list[dict]) -> list[dict]:
         column_name_map = dict(zip(raw_columns, sanitized_columns))
-        return [{column_name_map[key]: val for key, val in row.items()} for row in rows]
+        return [{column_name_map[key]: value for key, value in row.items()} for row in rows]

@@ -76,8 +76,8 @@ class ChatOrchestrator:
 
     def _build_initial_messages(self, request: ChatRequest) -> list[dict]:
         messages: list[dict] = [{"role": "system", "content": self._system_prompt}]
-        for msg in request.messages:
-            messages.append({"role": msg.role, "content": msg.content})
+        for message in request.messages:
+            messages.append({"role": message.role, "content": message.content})
         return messages
 
     def _build_assistant_message(self, llm_response: LLMResponse) -> dict:

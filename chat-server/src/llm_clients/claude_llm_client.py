@@ -99,8 +99,8 @@ class ClaudeLLMClient(LLMClient):
 
         try:
             return await self._client.messages.create(**kwargs)
-        except anthropic.APIError as err:
-            logger.error("Claude API call failed: %s", err)
+        except anthropic.APIError as error:
+            logger.error("Claude API call failed: %s", error)
             raise
 
     def _parse_response(self, response) -> LLMResponse:

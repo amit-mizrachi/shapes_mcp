@@ -26,20 +26,20 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def server_lifespan(server: FastMCP):
     logger.info("Starting MCP server")
-    db_path = Path(Config.get("mcp_server.db_path"))
-    db_path.parent.mkdir(parents=True, exist_ok=True)
+    database_path = Path(Config.get("mcp_server.db_path"))
+    database_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
         data_store = build_data_store(Config.get("mcp_server.csv_file_path"))
         yield {"data_store": data_store}
     finally:
-        if db_path.exists():
-            db_path.unlink()
-            logger.info("Cleaned up database file: %s", db_path)
+        if database_path.exists():
+            database_path.unlink()
+            logger.info("Cleaned up database file: %s", database_path)
 
-def build_data_store(csv_path: str) -> SqliteDataStore:
+def build_data_store(csv_file_path: str) -> SqliteDataStore:
     logger.info("Parsing CSV data")
-    parsed_csv = CSVParser.parse(csv_path)
+    parsed_csv = CSVParser.parse(csv_file_path)
 
     logger.info("Enriching parsed data")
     enricher = ColumnEnricher(rules=[NominalDateRule(), MonthExtractionRule(), YearExtractionRule()])

@@ -21,35 +21,35 @@ def detect_date_columns(
 ) -> list[tuple[str, str]]:
     """Return (column_name, date_format) pairs for columns that look like dates."""
     result: list[tuple[str, str]] = []
-    for col in columns:
-        if col.detected_type == "numeric":
+    for column in columns:
+        if column.detected_type == "numeric":
             continue
-        fmt = _detect_date_format(col.name, sample_rows)
-        if fmt is not None:
-            result.append((col.name, fmt))
+        date_format = _detect_date_format(column.name, sample_rows)
+        if date_format is not None:
+            result.append((column.name, date_format))
     return result
 
 
-def _detect_date_format(col_name: str, sample_rows: list[dict]) -> str | None:
+def _detect_date_format(column_name: str, sample_rows: list[dict]) -> str | None:
     values = [
-        str(r.get(col_name, "")).strip()
-        for r in sample_rows
-        if str(r.get(col_name, "")).strip()
+        str(row.get(column_name, "")).strip()
+        for row in sample_rows
+        if str(row.get(column_name, "")).strip()
     ]
     if not values:
         return None
 
-    for fmt in _DATE_FORMATS:
-        parsed_count = sum(1 for v in values if _try_parse(v, fmt))
+    for date_format in _DATE_FORMATS:
+        parsed_count = sum(1 for value in values if _try_parse(value, date_format))
         if parsed_count / len(values) >= _DETECTION_THRESHOLD:
-            return fmt
+            return date_format
 
     return None
 
 
-def _try_parse(value: str, fmt: str) -> bool:
+def _try_parse(value: str, date_format: str) -> bool:
     try:
-        datetime.strptime(value, fmt)
+        datetime.strptime(value, date_format)
         return True
     except ValueError:
         return False

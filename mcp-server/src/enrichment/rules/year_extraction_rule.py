@@ -19,11 +19,11 @@ class YearExtractionRule(EnrichmentRule):
         self, columns: list[ColumnInfo], sample_rows: list[dict],
     ) -> list[ColumnInfo]:
         self._date_columns = detect_date_columns(columns, sample_rows)
-        existing_names = {c.name for c in columns}
+        existing_names = {column.name for column in columns}
         new_columns: list[ColumnInfo] = []
 
-        for col_name, _ in self._date_columns:
-            derived = f"{col_name}_year"
+        for column_name, _ in self._date_columns:
+            derived = f"{column_name}_year"
             if derived not in existing_names:
                 new_columns.append(ColumnInfo(name=derived, detected_type="numeric", samples=[]))
                 logger.info("YearExtractionRule: will add '%s'", derived)
@@ -32,14 +32,14 @@ class YearExtractionRule(EnrichmentRule):
 
     def add_derived_columns(self, rows: list[dict]) -> list[dict]:
         for row in rows:
-            for col_name, fmt in self._date_columns:
-                raw = str(row.get(col_name, "")).strip()
-                key = f"{col_name}_year"
+            for column_name, date_format in self._date_columns:
+                raw = str(row.get(column_name, "")).strip()
+                key = f"{column_name}_year"
                 if not raw:
                     row[key] = None
                     continue
                 try:
-                    parsed = datetime.strptime(raw, fmt).date()
+                    parsed = datetime.strptime(raw, date_format).date()
                     row[key] = parsed.year
                 except ValueError:
                     row[key] = None
