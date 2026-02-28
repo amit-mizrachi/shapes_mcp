@@ -8,9 +8,7 @@ import pytest
 from shared.modules.data.column_info import ColumnInfo
 from shared.modules.data.parsed_csv import ParsedCSV
 from enrichment.column_enricher import ColumnEnricher
-from enrichment.rules.nominal_date_rule import NominalDateRule
-from enrichment.rules.month_extraction_rule import MonthExtractionRule
-from enrichment.rules.year_extraction_rule import YearExtractionRule
+from enrichment.rules.date_enrichment_rule import DateEnrichmentRule
 
 
 def _make_parsed_csv(columns, rows, table_name="test_table"):
@@ -19,7 +17,7 @@ def _make_parsed_csv(columns, rows, table_name="test_table"):
 
 
 def _all_rules():
-    return [NominalDateRule(), MonthExtractionRule(), YearExtractionRule()]
+    return [DateEnrichmentRule()]
 
 
 class TestEnrich:

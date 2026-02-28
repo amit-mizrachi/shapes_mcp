@@ -1,4 +1,4 @@
-"""Tests for NominalDateRule — days-since-epoch computation."""
+"""Tests for DateEnrichmentRule — days/month/year extraction from date columns."""
 
 from datetime import date
 from unittest.mock import patch
@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from shared.modules.data.column_info import ColumnInfo
-from enrichment.rules.nominal_date_rule import NominalDateRule
+from enrichment.rules.date_enrichment_rule import DateEnrichmentRule
 
 
 def _cols(*names_types):
@@ -19,17 +19,17 @@ def _rows(col_name, values):
 
 @pytest.fixture()
 def rule():
-    return NominalDateRule()
+    return DateEnrichmentRule()
 
 
 class TestInferDerivedColumns:
-    def test_adds_days_column(self, rule):
+    def test_adds_all_three_columns(self, rule):
         cols = _cols(("dob", "text"))
         rows = _rows("dob", ["28/01/1977", "15/06/1990", "03/12/1985"])
         result = rule.infer_derived_columns(cols, rows)
-        assert len(result) == 1
-        assert result[0].name == "dob_days"
-        assert result[0].detected_type == "numeric"
+        names = [c.name for c in result]
+        assert names == ["dob_days", "dob_month", "dob_year"]
+        assert all(c.detected_type == "numeric" for c in result)
 
     def test_multiple_date_columns(self, rule):
         cols = _cols(("dob", "text"), ("start", "text"))
@@ -39,10 +39,14 @@ class TestInferDerivedColumns:
             {"dob": "03/12/1985", "start": "28/11/2021"},
         ]
         result = rule.infer_derived_columns(cols, rows)
-        assert len(result) == 2
         names = [c.name for c in result]
+        assert len(result) == 6
         assert "dob_days" in names
+        assert "dob_month" in names
+        assert "dob_year" in names
         assert "start_days" in names
+        assert "start_month" in names
+        assert "start_year" in names
 
     def test_skips_non_date(self, rule):
         cols = _cols(("name", "text"))
@@ -51,11 +55,19 @@ class TestInferDerivedColumns:
         assert result == []
 
     def test_skips_conflict(self, rule):
+        cols = _cols(("dob", "text"), ("dob_days", "numeric"), ("dob_month", "numeric"), ("dob_year", "numeric"))
+        rows = [{"dob": "28/01/1977", "dob_days": 999, "dob_month": 1, "dob_year": 1977}] * 3
+        result = rule.infer_derived_columns(cols, rows)
+        assert result == []
+
+    def test_skips_only_conflicting_suffix(self, rule):
         cols = _cols(("dob", "text"), ("dob_days", "numeric"))
         rows = [{"dob": "28/01/1977", "dob_days": 999}] * 3
         result = rule.infer_derived_columns(cols, rows)
         names = [c.name for c in result]
         assert "dob_days" not in names
+        assert "dob_month" in names
+        assert "dob_year" in names
 
 
 class TestAddDerivedColumns:
@@ -80,12 +92,54 @@ class TestAddDerivedColumns:
         result = rule.add_derived_columns(rows)
         assert result[0]["dob_days"] == -1
 
+    def test_extracts_month(self, rule):
+        cols = _cols(("dob", "text"))
+        rows = _rows("dob", ["28/01/1977"])
+        rule.infer_derived_columns(cols, rows)
+        result = rule.add_derived_columns(rows)
+        assert result[0]["dob_month"] == 1
+
+    def test_various_months(self, rule):
+        cols = _cols(("dob", "text"))
+        rows = _rows("dob", ["15/06/1990", "03/12/1985"])
+        rule.infer_derived_columns(cols, rows)
+        result = rule.add_derived_columns(rows)
+        assert result[0]["dob_month"] == 6
+        assert result[1]["dob_month"] == 12
+
+    def test_extracts_year(self, rule):
+        cols = _cols(("dob", "text"))
+        rows = _rows("dob", ["28/01/1977"])
+        rule.infer_derived_columns(cols, rows)
+        result = rule.add_derived_columns(rows)
+        assert result[0]["dob_year"] == 1977
+
+    def test_various_years(self, rule):
+        cols = _cols(("dob", "text"))
+        rows = _rows("dob", ["15/06/1990", "03/12/2005"])
+        rule.infer_derived_columns(cols, rows)
+        result = rule.add_derived_columns(rows)
+        assert result[0]["dob_year"] == 1990
+        assert result[1]["dob_year"] == 2005
+
+    def test_all_three_values_from_single_parse(self, rule):
+        cols = _cols(("dob", "text"))
+        rows = _rows("dob", ["28/01/1977"])
+        rule.infer_derived_columns(cols, rows)
+        result = rule.add_derived_columns(rows)
+        expected_days = (date(1977, 1, 28) - date(1970, 1, 1)).days
+        assert result[0]["dob_days"] == expected_days
+        assert result[0]["dob_month"] == 1
+        assert result[0]["dob_year"] == 1977
+
     def test_handles_empty_values(self, rule):
         cols = _cols(("dob", "text"))
         rows = [{"dob": "28/01/1977"}, {"dob": ""}, {"dob": "15/06/1990"}]
         rule.infer_derived_columns(cols, rows)
         result = rule.add_derived_columns(rows)
         assert result[1]["dob_days"] is None
+        assert result[1]["dob_month"] is None
+        assert result[1]["dob_year"] is None
 
     def test_handles_unparseable(self, rule):
         cols = _cols(("dob", "text"))
@@ -96,11 +150,13 @@ class TestAddDerivedColumns:
         rule.infer_derived_columns(cols, rows)
         result = rule.add_derived_columns(rows)
         assert result[4]["dob_days"] is None
+        assert result[4]["dob_month"] is None
+        assert result[4]["dob_year"] is None
 
     def test_custom_epoch(self):
-        with patch("enrichment.rules.nominal_date_rule.Config") as mock_cfg:
+        with patch("enrichment.rules.date_enrichment_rule.Config") as mock_cfg:
             mock_cfg.get.return_value = "2000-01-01"
-            rule = NominalDateRule()
+            rule = DateEnrichmentRule()
         cols = _cols(("dob", "text"))
         rows = _rows("dob", ["02/01/2000"])
         rule.infer_derived_columns(cols, rows)
@@ -108,8 +164,6 @@ class TestAddDerivedColumns:
         assert result[0]["dob_days"] == 1
 
     def test_realistic_date(self, rule):
-        # 28/01/1977 = Jan 28 1977, epoch = 1970-01-01
-        # Expected: (date(1977,1,28) - date(1970,1,1)).days = 2583
         cols = _cols(("dob", "text"))
         rows = _rows("dob", ["28/01/1977"])
         rule.infer_derived_columns(cols, rows)
