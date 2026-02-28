@@ -12,6 +12,8 @@ from enrichment.rules.nominal_date_rule import NominalDateRule
 from enrichment.rules.month_extraction_rule import MonthExtractionRule
 from enrichment.rules.year_extraction_rule import YearExtractionRule
 from data_store.csv_parser import CSVParser
+from data_store.data_ingestor import DataIngestor
+from data_store.data_store import DataStore
 from data_store.sqlite_ingester import SqliteIngester
 from data_store.sqlite_data_store import SqliteDataStore
 from shared.config import Config
@@ -30,14 +32,15 @@ async def server_lifespan(server: FastMCP):
     database_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        data_store = build_data_store(Config.get("mcp_server.csv_file_path"))
+        csv_file_path = Config.get("mcp_server.csv_file_path")
+        data_store = build_data_store(csv_file_path)
         yield {"data_store": data_store}
     finally:
         if database_path.exists():
             database_path.unlink()
             logger.info("Cleaned up database file: %s", database_path)
 
-def build_data_store(csv_file_path: str) -> SqliteDataStore:
+def build_data_store(csv_file_path: str) -> DataStore:
     logger.info("Parsing CSV data")
     parsed_csv = CSVParser.parse(csv_file_path)
 
@@ -46,7 +49,7 @@ def build_data_store(csv_file_path: str) -> SqliteDataStore:
     enriched_csv = enricher.enrich(parsed_csv)
 
     logger.info("Ingesting enriched data to database")
-    ingester = SqliteIngester()
+    ingester: DataIngestor = SqliteIngester()
     table_schema = ingester.ingest(enriched_csv)
 
     logger.info("Initializing data store")

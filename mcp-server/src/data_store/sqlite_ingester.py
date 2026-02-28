@@ -3,9 +3,10 @@ import sqlite3
 from shared.config import Config
 from shared.modules.data.parsed_csv import ParsedCSV
 from shared.modules.data.table_schema import TableSchema
+from data_store.data_ingestor import DataIngestor
 
 
-class SqliteIngester:
+class SqliteIngester(DataIngestor):
     def __init__(self, database_path: str | None = None) -> None:
         self._db_uri = database_path or Config.get("mcp_server.db_path")
 
@@ -32,13 +33,13 @@ class SqliteIngester:
     def _insert_rows(self, connection: sqlite3.Connection, parsed_csv: ParsedCSV) -> None:
         column_types = {column.name: column.detected_type for column in parsed_csv.columns}
         placeholders = ", ".join("?" for _ in parsed_csv.headers)
-        all_values = [
+        rows_as_values = (
             [self._to_sql_value(row[header], column_types[header]) for header in parsed_csv.headers]
             for row in parsed_csv.rows
-        ]
+        )
         connection.cursor().executemany(
             f'INSERT INTO "{parsed_csv.table_name}" VALUES ({placeholders})',
-            all_values,
+            rows_as_values,
         )
 
     @staticmethod
