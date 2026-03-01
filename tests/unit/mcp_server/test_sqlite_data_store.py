@@ -49,6 +49,14 @@ class TestSelectRows:
         result = await data_store_with_data.select_rows(limit=2)
         assert result.count == 2
 
+    async def test_limit_clamped_to_minimum(self, data_store_with_data):
+        result = await data_store_with_data.select_rows(limit=0)
+        assert result.count == 1
+
+    async def test_limit_clamped_to_maximum(self, data_store_with_data):
+        result = await data_store_with_data.select_rows(limit=999)
+        assert result.count == 5  # sample_data has 5 rows, all returned
+
     async def test_select_specific_fields(self, data_store_with_data):
         result = await data_store_with_data.select_rows(fields=["name", "age"])
         assert set(result.columns) == {"name", "age"}

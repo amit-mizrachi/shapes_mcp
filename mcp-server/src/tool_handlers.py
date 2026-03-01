@@ -14,48 +14,6 @@ from data_store.interfaces.data_store import DataStore
 logger = logging.getLogger(__name__)
 
 
-def _validate_order(order: str) -> str:
-    """Return normalized order or raise ValueError."""
-    normalized = order.lower()
-    if normalized not in ("asc", "desc"):
-        raise ValueError("order must be 'asc' or 'desc'")
-    return normalized
-
-
-def _clamp_limit(limit: int) -> int:
-    max_limit = Config.get("mcp_server.max_query_limit")
-    return max(1, min(limit, max_limit))
-
-
-def _format_query_response(query_result: QueryResult) -> str:
-    response = {"data": query_result.rows, "count": query_result.count}
-    if query_result.total_count is not None:
-        response["total_count"] = query_result.total_count
-    return json.dumps(response)
-
-
-def _build_date_context() -> dict:
-    epoch_string = Config.get("mcp_server.enrichment.nominal_date_epoch")
-    epoch = date.fromisoformat(epoch_string)
-    today_nominal = (date.today() - epoch).days
-    return {
-        "nominal_date_epoch": epoch_string,
-        "today_as_nominal_days": today_nominal,
-    }
-
-
-async def _execute_query(tool_name: str, coro) -> str:
-    try:
-        query_result = await coro
-    except ValueError as error:
-        logger.warning("%s validation error: %s", tool_name, error)
-        return json.dumps({"error": str(error)})
-    except Exception as error:
-        logger.error("%s failed unexpectedly", tool_name, exc_info=True)
-        return json.dumps({"error": f"Internal error: {error}"})
-    return _format_query_response(query_result)
-
-
 async def get_schema(context: Context) -> str:
     """Return the database schema: table name, column names, detected types, and sample values.
 
@@ -83,6 +41,7 @@ async def get_schema(context: Context) -> str:
         },
         indent=2,
     )
+
 
 async def select_rows(
     filters: Optional[list[FilterCondition]] = None,
@@ -126,17 +85,20 @@ async def select_rows(
     """
     logger.info("Executing row selection tool")
     data_store = _get_data_store(context)
-
-    async def _query():
+    try:
         validated_order = _validate_order(order)
-        clamped_limit = _clamp_limit(limit)
-        return await data_store.select_rows(
-            filters=filters, fields=fields, limit=clamped_limit,
+        query_result = await data_store.select_rows(
+            filters=filters, fields=fields, limit=limit,
             order_by=order_by, order=validated_order, distinct=distinct, transform=transform,
             filter_logic=filter_logic,
         )
-
-    return await _execute_query("select_rows", _query())
+    except ValueError as error:
+        logger.warning("select_rows validation error: %s", error)
+        return json.dumps({"error": str(error)})
+    except Exception as error:
+        logger.error("select_rows failed unexpectedly", exc_info=True)
+        return json.dumps({"error": f"Internal error: {error}"})
+    return _format_query_response(query_result)
 
 
 async def aggregate(
@@ -190,17 +152,20 @@ async def aggregate(
     """
     logger.info("Executing aggregation tool")
     data_store = _get_data_store(context)
-
-    async def _query():
+    try:
         validated_order = _validate_order(order)
-        clamped_limit = _clamp_limit(limit)
-        return await data_store.aggregate(
-            operation=operation, field=field, group_by=group_by, filters=filters, limit=clamped_limit,
+        query_result = await data_store.aggregate(
+            operation=operation, field=field, group_by=group_by, filters=filters, limit=limit,
             order_by=order_by, order=validated_order, having_operator=having_operator, having_value=having_value,
             transform=transform, filter_logic=filter_logic,
         )
-
-    return await _execute_query("aggregate", _query())
+    except ValueError as error:
+        logger.warning("aggregate validation error: %s", error)
+        return json.dumps({"error": str(error)})
+    except Exception as error:
+        logger.error("aggregate failed unexpectedly", exc_info=True)
+        return json.dumps({"error": f"Internal error: {error}"})
+    return _format_query_response(query_result)
 
 def _get_data_store(context: Context) -> DataStore:
     data_store = context.request_context.lifespan_context.get("data_store")
@@ -208,3 +173,28 @@ def _get_data_store(context: Context) -> DataStore:
         logger.error("DataStore not initialized")
         raise RuntimeError("DataStore not initialized")
     return data_store
+
+
+def _build_date_context() -> dict:
+    epoch_string = Config.get("mcp_server.enrichment.nominal_date_epoch")
+    epoch = date.fromisoformat(epoch_string)
+    today_nominal = (date.today() - epoch).days
+    return {
+        "nominal_date_epoch": epoch_string,
+        "today_as_nominal_days": today_nominal,
+    }
+
+
+def _validate_order(order: str) -> str:
+    """Return normalized order or raise ValueError."""
+    normalized = order.lower()
+    if normalized not in ("asc", "desc"):
+        raise ValueError("order must be 'asc' or 'desc'")
+    return normalized
+
+
+def _format_query_response(query_result: QueryResult) -> str:
+    response = {"data": query_result.rows, "count": query_result.count}
+    if query_result.total_count is not None:
+        response["total_count"] = query_result.total_count
+    return json.dumps(response)

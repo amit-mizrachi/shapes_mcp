@@ -23,13 +23,13 @@ class SqliteIngester(DataIngestor):
         return TableSchema(table_name=parsed_csv.table_name, columns=parsed_csv.columns)
 
     def _create_table(self, connection: sqlite3.Connection, parsed: ParsedCSV) -> None:
-        column_defs = ", ".join(
+        column_definitions = ", ".join(
             f'"{column.name}" {"REAL" if column.detected_type == "numeric" else "TEXT"}'
             for column in parsed.columns
         )
         cursor = connection.cursor()
         cursor.execute(f'DROP TABLE IF EXISTS "{parsed.table_name}"')
-        cursor.execute(f'CREATE TABLE "{parsed.table_name}" ({column_defs})')
+        cursor.execute(f'CREATE TABLE "{parsed.table_name}" ({column_definitions})')
 
     def _insert_rows(self, connection: sqlite3.Connection, parsed_csv: ParsedCSV) -> None:
         column_types = {column.name: column.detected_type for column in parsed_csv.columns}

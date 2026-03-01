@@ -22,7 +22,7 @@ class Config:
         "chat_server.semaphore_timeout":             30.0,
         "chat_server.mcp_connection.retry_attempts": 3,
         "chat_server.mcp_connection.retry_sleep":    3,
-        "chat_server.timeout_seconds":               120,
+        "chat_server.chat_request_timeout_seconds":   120,
         "chat_server.llm_provider":                  "gemini",
         "chat_server.anthropic_model":   "claude-sonnet-4-20250514",
         "chat_server.max_tokens":        10000,

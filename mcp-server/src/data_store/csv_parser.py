@@ -110,12 +110,7 @@ class CSVParser:
 
     @staticmethod
     def detect_column_type(values: list[str], numeric_threshold: float = 0.8) -> str:
-        """Classify a column as 'numeric' or 'text' based on its values.
-
-        A column is 'numeric' when the fraction of non-blank values that
-        parse as floats exceeds *numeric_threshold*. Blank and None values
-        are ignored.
-        """
+        """Classify a column as 'numeric' or 'text' based on its values."""
         numeric_count = 0
         total = 0
         for raw_value in values:

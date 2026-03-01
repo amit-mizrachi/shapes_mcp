@@ -42,6 +42,8 @@ class SqliteDataStore(DataStore):
         transform: Optional[TransformExpression] = None,
         filter_logic: str = "AND",
     ) -> QueryResult:
+        max_limit = Config.get("mcp_server.max_query_limit")
+        limit = max(1, min(limit, max_limit))
         distinct_keyword = "DISTINCT " if distinct else ""
         select_columns = self._build_select_columns(fields)
         where_clause, where_params = self._build_where_clause(filters, filter_logic)
@@ -85,6 +87,8 @@ class SqliteDataStore(DataStore):
         transform: Optional[TransformExpression] = None,
         filter_logic: str = "AND",
     ) -> QueryResult:
+        max_limit = Config.get("mcp_server.max_query_limit")
+        limit = max(1, min(limit, max_limit))
         group_by_columns = self._normalize_group_by(group_by)
 
         if transform:

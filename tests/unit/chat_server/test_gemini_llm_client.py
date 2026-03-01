@@ -37,7 +37,7 @@ class TestConvertTools:
     @pytest.fixture()
     def client(self):
         with patch("llm_clients.gemini_llm_client.genai"):
-            return GeminiLLMClient(model="gemini-2.5-flash", max_tokens=4096)
+            return GeminiLLMClient()
 
     def test_converts_mcp_to_gemini_format(self, client):
         mcp_tools = [
@@ -73,7 +73,7 @@ class TestConvertMessages:
     @pytest.fixture()
     def client(self):
         with patch("llm_clients.gemini_llm_client.genai"):
-            return GeminiLLMClient(model="gemini-2.5-flash", max_tokens=4096)
+            return GeminiLLMClient()
 
     def test_system_message_extracted(self, client):
         system, contents = client._convert_messages([
@@ -151,7 +151,7 @@ class TestInvoke:
         mock_genai.aio.models.generate_content.return_value = _make_response([
             _text_part("Hello world"),
         ])
-        client = GeminiLLMClient(model="gemini-2.5-flash", max_tokens=4096)
+        client = GeminiLLMClient()
         result = await client.invoke(
             messages=[{"role": "user", "content": "hi"}],
             tools=[],
@@ -164,7 +164,7 @@ class TestInvoke:
             _text_part("Let me check"),
             _fc_part("get_schema", {}, id="gc_1"),
         ])
-        client = GeminiLLMClient(model="gemini-2.5-flash", max_tokens=4096)
+        client = GeminiLLMClient()
         result = await client.invoke(
             messages=[{"role": "user", "content": "show schema"}],
             tools=[{"name": "get_schema", "description": "x", "inputSchema": {}}],
@@ -178,7 +178,7 @@ class TestInvoke:
         mock_genai.aio.models.generate_content.return_value = _make_response([
             _fc_part("get_schema", {}, id=None),
         ])
-        client = GeminiLLMClient(model="gemini-2.5-flash", max_tokens=4096)
+        client = GeminiLLMClient()
         result = await client.invoke(
             messages=[{"role": "user", "content": "schema"}],
             tools=[],
@@ -190,7 +190,7 @@ class TestInvoke:
         mock_genai.aio.models.generate_content.return_value = _make_response([
             _text_part("ok"),
         ])
-        client = GeminiLLMClient(model="gemini-2.5-flash", max_tokens=4096)
+        client = GeminiLLMClient()
         await client.invoke(
             messages=[
                 {"role": "system", "content": "You are helpful"},
@@ -205,8 +205,8 @@ class TestInvoke:
         mock_genai.aio.models.generate_content.return_value = SimpleNamespace(
             candidates=[], prompt_feedback="BLOCKED",
         )
-        client = GeminiLLMClient(model="gemini-2.5-flash", max_tokens=4096)
-        with pytest.raises(RuntimeError, match="no candidates"):
+        client = GeminiLLMClient()
+        with pytest.raises(RuntimeError, match="no usable content"):
             await client.invoke(
                 messages=[{"role": "user", "content": "hi"}],
                 tools=[],
@@ -217,7 +217,7 @@ class TestInvoke:
             _text_part("Hello"),
             _text_part("World"),
         ])
-        client = GeminiLLMClient(model="gemini-2.5-flash", max_tokens=4096)
+        client = GeminiLLMClient()
         result = await client.invoke(
             messages=[{"role": "user", "content": "hi"}],
             tools=[],
@@ -231,7 +231,7 @@ class TestSanitizeSchema:
     @pytest.fixture()
     def client(self):
         with patch("llm_clients.gemini_llm_client.genai"):
-            return GeminiLLMClient(model="gemini-2.5-flash", max_tokens=4096)
+            return GeminiLLMClient()
 
     def test_strips_additional_properties_from_nested(self, client):
         schema = {

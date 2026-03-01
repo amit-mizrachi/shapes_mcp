@@ -1,9 +1,7 @@
 """Tests for date_detection shared utility — format detection logic."""
 
-import pytest
-
 from shared.modules.data.column_info import ColumnInfo
-from enrichment.rules.date_detection import detect_date_columns
+from enrichment.utils.date_detection import detect_date_columns
 
 
 def _cols(*names_types):

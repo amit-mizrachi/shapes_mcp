@@ -18,7 +18,7 @@ def _tool_use_block(block_id: str, name: str, tool_input: dict):
 
 class TestConvertTools:
     def test_converts_mcp_to_claude_format(self):
-        client = ClaudeLLMClient(model="test-model", max_tokens=4096)
+        client = ClaudeLLMClient()
         mcp_tools = [
             {
                 "name": "get_schema",
@@ -33,19 +33,19 @@ class TestConvertTools:
         assert result[0]["input_schema"] == {"type": "object", "properties": {}}
 
     def test_missing_description(self):
-        client = ClaudeLLMClient(model="test-model", max_tokens=4096)
+        client = ClaudeLLMClient()
         mcp_tools = [{"name": "tool1", "inputSchema": {}}]
         result = client._convert_tools(mcp_tools)
         assert result[0]["description"] is None
 
     def test_empty_tools(self):
-        client = ClaudeLLMClient(model="test-model", max_tokens=4096)
+        client = ClaudeLLMClient()
         assert client._convert_tools([]) == []
 
 
 class TestConvertMessages:
     def _client(self):
-        return ClaudeLLMClient(model="test-model", max_tokens=4096)
+        return ClaudeLLMClient()
 
     def test_system_message_extracted(self):
         system, msgs = self._client()._convert_messages([
@@ -110,7 +110,7 @@ class TestInvoke:
         mock_anthropic.messages.create = AsyncMock(return_value=SimpleNamespace(
             content=[_text_block("Hello world")],
         ))
-        client = ClaudeLLMClient(model="test-model", max_tokens=4096)
+        client = ClaudeLLMClient()
         result = await client.invoke(
             messages=[{"role": "user", "content": "hi"}],
             tools=[],
@@ -125,7 +125,7 @@ class TestInvoke:
                 _tool_use_block("tc_1", "get_schema", {}),
             ],
         ))
-        client = ClaudeLLMClient(model="test-model", max_tokens=4096)
+        client = ClaudeLLMClient()
         result = await client.invoke(
             messages=[{"role": "user", "content": "show schema"}],
             tools=[{"name": "get_schema", "description": "x", "inputSchema": {}}],
@@ -142,7 +142,7 @@ class TestInvoke:
                 _tool_use_block("tc_2", "select_rows", {"limit": 5}),
             ],
         ))
-        client = ClaudeLLMClient(model="test-model", max_tokens=4096)
+        client = ClaudeLLMClient()
         result = await client.invoke(
             messages=[{"role": "user", "content": "analyze"}],
             tools=[],
@@ -154,7 +154,7 @@ class TestInvoke:
         mock_anthropic.messages.create = AsyncMock(return_value=SimpleNamespace(
             content=[_text_block("ok")],
         ))
-        client = ClaudeLLMClient(model="test-model", max_tokens=4096)
+        client = ClaudeLLMClient()
         await client.invoke(
             messages=[
                 {"role": "system", "content": "You are helpful"},
@@ -172,7 +172,7 @@ class TestInvoke:
         mock_anthropic.messages.create = AsyncMock(return_value=SimpleNamespace(
             content=[_text_block("ok")],
         ))
-        client = ClaudeLLMClient(model="test-model", max_tokens=4096)
+        client = ClaudeLLMClient()
         await client.invoke(
             messages=[{"role": "user", "content": "hi"}],
             tools=[],
@@ -185,7 +185,7 @@ class TestInvoke:
         mock_anthropic.messages.create = AsyncMock(return_value=SimpleNamespace(
             content=[_tool_use_block("tc_1", "select_rows", '{"limit": 5}')],
         ))
-        client = ClaudeLLMClient(model="test-model", max_tokens=4096)
+        client = ClaudeLLMClient()
         result = await client.invoke(
             messages=[{"role": "user", "content": "query"}],
             tools=[],
@@ -196,7 +196,7 @@ class TestInvoke:
         mock_anthropic.messages.create = AsyncMock(return_value=SimpleNamespace(
             content=[_text_block("Hello"), _text_block("World")],
         ))
-        client = ClaudeLLMClient(model="test-model", max_tokens=4096)
+        client = ClaudeLLMClient()
         result = await client.invoke(
             messages=[{"role": "user", "content": "hi"}],
             tools=[],

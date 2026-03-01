@@ -54,7 +54,7 @@ The public entry point. Iterates over a list of column metadata objects, skips a
 
 ```python
 from shared.modules.data.column_info import ColumnInfo
-from enrichment.rules.date_detection import detect_date_columns
+from enrichment.utils.date_detection import detect_date_columns
 
 columns = [
     ColumnInfo(name="id", detected_type="numeric"),
@@ -95,14 +95,14 @@ Internal helper. Extracts the values for a single column from the sample rows, s
 **Example:**
 
 ```python
-from enrichment.rules.date_detection import _detect_date_format
+from enrichment.utils.date_detection import _detect_date_format
 
 rows = [
     {"start": "2024-01-15"},
     {"start": "2024-06-30"},
     {"start": "2024-12-25"},
-    {"start": ""},           # empty -- excluded from count
-    {"start": "not-a-date"}, # will fail to parse
+    {"start": ""},  # empty -- excluded from count
+    {"start": "not-a-date"},  # will fail to parse
 ]
 
 fmt = _detect_date_format("start", rows)
@@ -135,12 +135,12 @@ Internal helper. Attempts to parse a single string value using `datetime.strptim
 **Example:**
 
 ```python
-from enrichment.rules.date_detection import _try_parse
+from enrichment.utils.date_detection import _try_parse
 
-_try_parse("2024-01-15", "%Y-%m-%d")   # True
-_try_parse("15/01/2024", "%Y-%m-%d")   # False
-_try_parse("not-a-date", "%d/%m/%Y")   # False
-_try_parse("28/01/1977", "%d/%m/%Y")   # True
+_try_parse("2024-01-15", "%Y-%m-%d")  # True
+_try_parse("15/01/2024", "%Y-%m-%d")  # False
+_try_parse("not-a-date", "%d/%m/%Y")  # False
+_try_parse("28/01/1977", "%d/%m/%Y")  # True
 ```
 
 ---

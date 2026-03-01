@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, date
 
 from enrichment.enrichment_rule import EnrichmentRule
-from enrichment.rules.date_detection import detect_date_columns
+from enrichment.utils.date_detection import detect_date_columns
 from shared.config import Config
 from shared.modules.data.column_info import ColumnInfo
 

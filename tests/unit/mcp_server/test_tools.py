@@ -162,16 +162,6 @@ class TestValidateOrder:
             tool_handlers._validate_order("random")
 
 
-class TestClampLimit:
-    def test_below_minimum(self):
-        assert tool_handlers._clamp_limit(0) == 1
-
-    def test_above_max(self):
-        assert tool_handlers._clamp_limit(999) == 100
-
-    def test_within_range(self):
-        assert tool_handlers._clamp_limit(50) == 50
-
 
 class TestFormatQueryResponse:
     def test_with_total_count(self):

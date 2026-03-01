@@ -29,7 +29,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     llm_client = LLMClientFactory.create()
 
     app.state.orchestrator = ChatOrchestrator(llm_client=llm_client, mcp_manager=mcp_manager)
-    app.state.timeout = Config.get("chat_server.timeout_seconds")
 
     yield
 
@@ -52,12 +51,14 @@ async def health():
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest, raw_request: Request):
     try:
+        logger.info("Received chat request: %s", request)
         response = await asyncio.wait_for(
             raw_request.app.state.orchestrator.execute(request),
-            timeout=raw_request.app.state.timeout,
+            timeout=Config.get("chat_server.chat_request_timeout_seconds"),
         )
         return response
     except asyncio.TimeoutError:
+        logger.error("Request timed out: %s", request)
         return JSONResponse(status_code=504, content={"detail": "Request timed out"})
     except Exception:
         logger.exception("Unhandled error in /chat")
