@@ -9,6 +9,7 @@ from shared.modules.api.chat_request import ChatRequest
 from shared.modules.api.message_item import MessageItem
 from shared.modules.llm.llm_response import LLMResponse
 from shared.modules.llm.tool_call import ToolCall
+from shared.modules.llm.messages import SystemMessage
 from chat_orchestrator import ChatOrchestrator
 
 
@@ -128,8 +129,8 @@ class TestAgentLoop:
 
         call_args = mock_llm_client.invoke.call_args
         messages = call_args[0][0]
-        assert messages[0]["role"] == "system"
-        assert messages[0]["content"] == Config.get("chat_server.system_prompt")
+        assert isinstance(messages[0], SystemMessage)
+        assert messages[0].content == Config.get("chat_server.system_prompt")
 
     async def test_tool_call_with_text(self, mock_llm_client, mock_mcp_manager, mock_mcp_client):
         """LLM returns both text and tool call in same response."""

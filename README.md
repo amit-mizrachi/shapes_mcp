@@ -101,8 +101,22 @@ Date columns are automatically detected and enriched with three derived columns:
 ### Multi-Dimensional Value Normalization
 The `transform` parameter enables CASE WHEN logic so the LLM can normalize mixed units across multiple dimensions (e.g., converting water usage that varies by both unit *and* frequency into a common base) — all within safe, parameterized SQL.
 
+### Typed Message Hierarchy
+
+The chat orchestrator communicates with LLM clients through a typed message hierarchy rather than raw dicts. All message types inherit from `ChatMessage`:
+
+| Type | Fields | Description |
+|------|--------|-------------|
+| `SystemMessage` | `content: str` | System prompt injected at the start of every conversation. |
+| `UserMessage` | `content: str` | A user's natural-language input, or a retry hint after a malformed tool call. |
+| `AssistantMessage` | `text: str \| None`, `tool_calls: list[ToolCall]` | The LLM's response — may contain text, tool calls, or both. Validated to require at least one. |
+| `ToolMessage` | `results: list[ToolResult]` | Tool execution results returned to the LLM for the next reasoning step. |
+| `ToolResult` | `tool_call_id: str`, `name: str`, `content: str`, `is_error: bool` | A single tool's output, linked back to its call by ID. |
+
+Each LLM client's `_convert_messages` method pattern-matches on these types and translates them to the provider's wire format (e.g., Claude's `tool_use`/`tool_result` blocks, Gemini's `FunctionCall`/`FunctionResponse` parts).
+
 ### Multi-Provider LLM Support
-Swap between Claude and Gemini by changing a single config value. Both providers are abstracted behind an `LLMClient` interface. Adding a new provider requires implementing the interface and adding one branch to the factory.
+Swap between Claude and Gemini by changing a single config value. Both providers are abstracted behind an `LLMClient` interface with a typed `list[ChatMessage]` contract. Adding a new provider requires implementing the interface and adding one branch to the factory.
 
 ### Malformed Tool Call Recovery
 When an LLM returns a malformed function call (common with complex schemas), the system automatically retries with a hint message — up to 2 retries per iteration.
@@ -148,7 +162,16 @@ shapes_mcp/
 │   └── modules/
 │       ├── api/                       # Request/response models
 │       ├── data/                      # Domain models (filters, transforms, schema)
-│       ├── llm/                       # LLM response/tool call models
+│       ├── llm/                       # LLM models
+│       │   ├── llm_response.py        # Provider-agnostic LLM response
+│       │   ├── tool_call.py           # Tool call (id, name, arguments)
+│       │   ├── tool_result.py         # Tool result (content, is_error)
+│       │   └── messages/              # Typed message hierarchy
+│       │       ├── chat_message.py    # ChatMessage base class
+│       │       ├── system_message.py  # SystemMessage
+│       │       ├── user_message.py    # UserMessage
+│       │       ├── assistant_message.py # AssistantMessage
+│       │       └── tool_message.py    # ToolMessage
 │       └── shapes_base_model.py       # Base Pydantic model
 ├── mcp-server/                        # MCP Server service
 │   ├── Dockerfile
@@ -241,7 +264,8 @@ pytest tests/e2e/
 | Full conversation history per request | Enables follow-up questions without server-side session state |
 | Tool call traces in response | Makes the MCP agent loop visible and debuggable |
 | Streamable HTTP transport (not stdio) | Enables containerized deployment where MCP server is a separate network service |
-| LLM abstraction layer | Straightforward to swap providers or add new ones via the `LLMClient` interface |
+| Typed message hierarchy | `ChatMessage` base class with `SystemMessage`, `UserMessage`, `AssistantMessage`, `ToolMessage` subtypes — eliminates dict-based `isinstance` branching in LLM clients |
+| LLM abstraction layer | Straightforward to swap providers or add new ones via the `LLMClient` interface and typed message contract |
 | Read-only parameterized queries | Defense in depth: SQLite in read-only mode + parameter binding + column validation |
 | Enrichment pipeline with pluggable rules | New enrichment rules (currency, categorical) can be added without modifying existing code |
 | Pydantic models as tool schemas | FastMCP auto-generates JSON Schema from type hints, giving the LLM rich validated schemas |

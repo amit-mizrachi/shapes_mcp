@@ -6,6 +6,14 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from llm_clients.claude_llm_client import ClaudeLLMClient
+from shared.modules.llm.tool_call import ToolCall
+from shared.modules.llm.messages import (
+    AssistantMessage,
+    SystemMessage,
+    ToolMessage,
+    ToolResult,
+    UserMessage,
+)
 
 
 def _text_block(text: str):
@@ -49,8 +57,8 @@ class TestConvertMessages:
 
     def test_system_message_extracted(self):
         system, msgs = self._client()._convert_messages([
-            {"role": "system", "content": "Be helpful"},
-            {"role": "user", "content": "hi"},
+            SystemMessage(content="Be helpful"),
+            UserMessage(content="hi"),
         ])
         assert system == "Be helpful"
         assert len(msgs) == 1
@@ -58,17 +66,17 @@ class TestConvertMessages:
 
     def test_plain_user_passthrough(self):
         system, msgs = self._client()._convert_messages([
-            {"role": "user", "content": "hello"},
+            UserMessage(content="hello"),
         ])
         assert system is None
         assert msgs == [{"role": "user", "content": "hello"}]
 
     def test_tool_call_translated_to_tool_use(self):
         _, msgs = self._client()._convert_messages([
-            {"role": "assistant", "content": [
-                {"type": "text", "text": "Calling tool"},
-                {"type": "tool_call", "id": "tc_1", "name": "get_schema", "arguments": {"x": 1}},
-            ]},
+            AssistantMessage(
+                text="Calling tool",
+                tool_calls=[ToolCall(id="tc_1", name="get_schema", arguments={"x": 1})],
+            ),
         ])
         assert len(msgs) == 1
         blocks = msgs[0]["content"]
@@ -77,9 +85,9 @@ class TestConvertMessages:
 
     def test_tool_role_translated_to_user_with_tool_use_id(self):
         _, msgs = self._client()._convert_messages([
-            {"role": "tool", "content": [
-                {"type": "tool_result", "tool_call_id": "tc_1", "name": "get_schema", "content": "ok"},
-            ]},
+            ToolMessage(results=[
+                ToolResult(tool_call_id="tc_1", name="get_schema", content="ok"),
+            ]),
         ])
         assert len(msgs) == 1
         assert msgs[0]["role"] == "user"
@@ -89,9 +97,9 @@ class TestConvertMessages:
 
     def test_error_tool_result_preserved(self):
         _, msgs = self._client()._convert_messages([
-            {"role": "tool", "content": [
-                {"type": "tool_result", "tool_call_id": "tc_1", "name": "fail", "content": "boom", "is_error": True},
-            ]},
+            ToolMessage(results=[
+                ToolResult(tool_call_id="tc_1", name="fail", content="boom", is_error=True),
+            ]),
         ])
         part = msgs[0]["content"][0]
         assert part["is_error"] is True
@@ -112,7 +120,7 @@ class TestInvoke:
         ))
         client = ClaudeLLMClient()
         result = await client.invoke(
-            messages=[{"role": "user", "content": "hi"}],
+            messages=[UserMessage(content="hi")],
             tools=[],
         )
         assert result.text == "Hello world"
@@ -127,7 +135,7 @@ class TestInvoke:
         ))
         client = ClaudeLLMClient()
         result = await client.invoke(
-            messages=[{"role": "user", "content": "show schema"}],
+            messages=[UserMessage(content="show schema")],
             tools=[{"name": "get_schema", "description": "x", "inputSchema": {}}],
         )
         assert result.text == "Let me check"
@@ -144,7 +152,7 @@ class TestInvoke:
         ))
         client = ClaudeLLMClient()
         result = await client.invoke(
-            messages=[{"role": "user", "content": "analyze"}],
+            messages=[UserMessage(content="analyze")],
             tools=[],
         )
         assert len(result.tool_calls) == 2
@@ -157,8 +165,8 @@ class TestInvoke:
         client = ClaudeLLMClient()
         await client.invoke(
             messages=[
-                {"role": "system", "content": "You are helpful"},
-                {"role": "user", "content": "hi"},
+                SystemMessage(content="You are helpful"),
+                UserMessage(content="hi"),
             ],
             tools=[],
         )
@@ -174,7 +182,7 @@ class TestInvoke:
         ))
         client = ClaudeLLMClient()
         await client.invoke(
-            messages=[{"role": "user", "content": "hi"}],
+            messages=[UserMessage(content="hi")],
             tools=[],
         )
         call_kwargs = mock_anthropic.messages.create.call_args.kwargs
@@ -187,7 +195,7 @@ class TestInvoke:
         ))
         client = ClaudeLLMClient()
         result = await client.invoke(
-            messages=[{"role": "user", "content": "query"}],
+            messages=[UserMessage(content="query")],
             tools=[],
         )
         assert result.tool_calls[0].arguments == {"limit": 5}
@@ -198,7 +206,7 @@ class TestInvoke:
         ))
         client = ClaudeLLMClient()
         result = await client.invoke(
-            messages=[{"role": "user", "content": "hi"}],
+            messages=[UserMessage(content="hi")],
             tools=[],
         )
         assert result.text == "Hello\nWorld"

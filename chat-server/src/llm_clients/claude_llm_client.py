@@ -8,6 +8,13 @@ from llm_clients.llm_client import LLMClient
 from shared.config import Config
 from shared.modules.llm.llm_response import LLMResponse
 from shared.modules.llm.tool_call import ToolCall
+from shared.modules.llm.messages import (
+    AssistantMessage,
+    ChatMessage,
+    SystemMessage,
+    ToolMessage,
+    UserMessage,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -19,61 +26,58 @@ class ClaudeLLMClient(LLMClient):
         self._max_tokens = Config.get("chat_server.max_tokens")
 
 
-    async def invoke(self, messages: list[dict], tools: list[dict]) -> LLMResponse:
+    async def invoke(self, messages: list[ChatMessage], tools: list[dict]) -> LLMResponse:
         """Send messages to the Claude API and return a provider-agnostic LLMResponse."""
         system_prompt, claude_messages = self._convert_messages(messages)
         response = await self._send_request(system_prompt, claude_messages, tools)
         return self._parse_response(response)
 
-    def _convert_messages(self, messages: list[dict]) -> tuple[Optional[str], list[dict]]:
+    def _convert_messages(self, messages: list[ChatMessage]) -> tuple[Optional[str], list[dict]]:
         """Separate the system prompt and translate messages to Claude's format."""
         system_prompt = None
         claude_messages = []
 
         for message in messages:
-            role = message["role"]
-            if role == "system":
-                system_prompt = message["content"]
-            elif role == "user":
-                claude_messages.append(message)
-            elif role == "assistant" and isinstance(message.get("content"), list):
-                assistant_message = self._convert_assistant_tool_message(message)
-                claude_messages.append(assistant_message)
-            elif role == "assistant":
-                claude_messages.append(message)
-            elif role == "tool":
-                tool_message = self._convert_tool_result_message(message)
-                claude_messages.append(tool_message)
-            else:
-                raise ValueError(f"Unknown role: {role}")
+            match message:
+                case SystemMessage():
+                    system_prompt = message.content
+                case UserMessage():
+                    claude_messages.append({"role": "user", "content": message.content})
+                case AssistantMessage():
+                    claude_messages.append(self._convert_assistant_message(message))
+                case ToolMessage():
+                    claude_messages.append(self._convert_tool_message(message))
 
         return system_prompt, claude_messages
 
-    def _convert_tool_result_message(self, message: dict) -> dict:
-        """Convert a neutral tool-result message to Claude's user/tool_result format."""
-        converted_parts = []
-        for tool_result_part in message["content"]:
-            claude_tool_result = dict(tool_result_part)
-            claude_tool_result["type"] = "tool_result"
-            if "tool_call_id" in claude_tool_result:
-                claude_tool_result["tool_use_id"] = claude_tool_result.pop("tool_call_id")
-            converted_parts.append(claude_tool_result)
-        return {"role": "user", "content": converted_parts}
+    def _convert_assistant_message(self, msg: AssistantMessage) -> dict:
+        """Convert an AssistantMessage to Claude's tool_use format."""
+        content: list[dict] = []
+        if msg.text:
+            content.append({"type": "text", "text": msg.text})
+        for tc in msg.tool_calls:
+            content.append({
+                "type": "tool_use",
+                "id": tc.id,
+                "name": tc.name,
+                "input": tc.arguments,
+            })
+        return {"role": "assistant", "content": content}
 
-    def _convert_assistant_tool_message(self, message: dict) -> dict:
-        """Convert a neutral assistant tool-call message to Claude's tool_use format."""
-        converted_parts = []
-        for content_block in message["content"]:
-            if content_block.get("type") == "tool_call":
-                converted_parts.append({
-                    "type": "tool_use",
-                    "id": content_block["id"],
-                    "name": content_block["name"],
-                    "input": content_block["arguments"],
-                })
-            else:
-                converted_parts.append(content_block)
-        return {"role": "assistant", "content": converted_parts}
+    def _convert_tool_message(self, msg: ToolMessage) -> dict:
+        """Convert a ToolMessage to Claude's user/tool_result format."""
+        content = []
+        for result in msg.results:
+            part: dict = {
+                "type": "tool_result",
+                "tool_use_id": result.tool_call_id,
+                "name": result.name,
+                "content": result.content,
+            }
+            if result.is_error:
+                part["is_error"] = True
+            content.append(part)
+        return {"role": "user", "content": content}
 
     def _convert_tools(self, mcp_tools: list[dict]) -> list[dict]:
         """Convert MCP tool schemas to Claude's tool format."""

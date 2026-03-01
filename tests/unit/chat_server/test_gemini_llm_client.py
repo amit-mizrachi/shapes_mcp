@@ -7,6 +7,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from llm_clients.gemini_llm_client import GeminiLLMClient
+from shared.modules.llm.tool_call import ToolCall
+from shared.modules.llm.messages import (
+    AssistantMessage,
+    SystemMessage,
+    ToolMessage,
+    ToolResult,
+    UserMessage,
+)
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -77,8 +85,8 @@ class TestConvertMessages:
 
     def test_system_message_extracted(self, client):
         system, contents = client._convert_messages([
-            {"role": "system", "content": "Be helpful"},
-            {"role": "user", "content": "hi"},
+            SystemMessage(content="Be helpful"),
+            UserMessage(content="hi"),
         ])
         assert system == "Be helpful"
         assert len(contents) == 1
@@ -86,7 +94,7 @@ class TestConvertMessages:
 
     def test_user_message(self, client):
         _, contents = client._convert_messages([
-            {"role": "user", "content": "hello"},
+            UserMessage(content="hello"),
         ])
         assert len(contents) == 1
         assert contents[0].role == "user"
@@ -94,7 +102,7 @@ class TestConvertMessages:
 
     def test_assistant_text_message(self, client):
         _, contents = client._convert_messages([
-            {"role": "assistant", "content": "I can help"},
+            AssistantMessage(text="I can help"),
         ])
         assert len(contents) == 1
         assert contents[0].role == "model"
@@ -102,10 +110,10 @@ class TestConvertMessages:
 
     def test_assistant_tool_call_message(self, client):
         _, contents = client._convert_messages([
-            {"role": "assistant", "content": [
-                {"type": "text", "text": "Let me check"},
-                {"type": "tool_call", "id": "tc_1", "name": "get_schema", "arguments": {"x": 1}},
-            ]},
+            AssistantMessage(
+                text="Let me check",
+                tool_calls=[ToolCall(id="tc_1", name="get_schema", arguments={"x": 1})],
+            ),
         ])
         assert len(contents) == 1
         assert contents[0].role == "model"
@@ -118,9 +126,9 @@ class TestConvertMessages:
 
     def test_tool_result_message(self, client):
         _, contents = client._convert_messages([
-            {"role": "tool", "content": [
-                {"type": "tool_result", "tool_call_id": "tc_1", "name": "get_schema", "content": "ok"},
-            ]},
+            ToolMessage(results=[
+                ToolResult(tool_call_id="tc_1", name="get_schema", content="ok"),
+            ]),
         ])
         assert len(contents) == 1
         assert contents[0].role == "user"
@@ -131,7 +139,7 @@ class TestConvertMessages:
 
     def test_no_system_returns_none(self, client):
         system, _ = client._convert_messages([
-            {"role": "user", "content": "hi"},
+            UserMessage(content="hi"),
         ])
         assert system is None
 
@@ -153,7 +161,7 @@ class TestInvoke:
         ])
         client = GeminiLLMClient()
         result = await client.invoke(
-            messages=[{"role": "user", "content": "hi"}],
+            messages=[UserMessage(content="hi")],
             tools=[],
         )
         assert result.text == "Hello world"
@@ -166,7 +174,7 @@ class TestInvoke:
         ])
         client = GeminiLLMClient()
         result = await client.invoke(
-            messages=[{"role": "user", "content": "show schema"}],
+            messages=[UserMessage(content="show schema")],
             tools=[{"name": "get_schema", "description": "x", "inputSchema": {}}],
         )
         assert result.text == "Let me check"
@@ -180,7 +188,7 @@ class TestInvoke:
         ])
         client = GeminiLLMClient()
         result = await client.invoke(
-            messages=[{"role": "user", "content": "schema"}],
+            messages=[UserMessage(content="schema")],
             tools=[],
         )
         assert result.tool_calls[0].id.startswith("gemini_")
@@ -193,8 +201,8 @@ class TestInvoke:
         client = GeminiLLMClient()
         await client.invoke(
             messages=[
-                {"role": "system", "content": "You are helpful"},
-                {"role": "user", "content": "hi"},
+                SystemMessage(content="You are helpful"),
+                UserMessage(content="hi"),
             ],
             tools=[],
         )
@@ -208,7 +216,7 @@ class TestInvoke:
         client = GeminiLLMClient()
         with pytest.raises(RuntimeError, match="no usable content"):
             await client.invoke(
-                messages=[{"role": "user", "content": "hi"}],
+                messages=[UserMessage(content="hi")],
                 tools=[],
             )
 
@@ -219,7 +227,7 @@ class TestInvoke:
         ])
         client = GeminiLLMClient()
         result = await client.invoke(
-            messages=[{"role": "user", "content": "hi"}],
+            messages=[UserMessage(content="hi")],
             tools=[],
         )
         assert result.text == "Hello\nWorld"
