@@ -20,15 +20,13 @@ class DateEnrichmentRule(EnrichmentRule):
         self._epoch = date.fromisoformat(epoch_string)
         self._date_columns: list[tuple[str, str, tuple[str, ...]]] = []
 
-    def infer_derived_columns(
-        self, columns: list[ColumnInfo], sample_rows: list[dict],
-    ) -> list[ColumnInfo]:
-        detected = detect_date_columns(columns, sample_rows)
+    def infer_derived_columns(self, columns: list[ColumnInfo], sample_rows: list[dict]) -> list[ColumnInfo]:
+        detected_columns = detect_date_columns(columns, sample_rows)
         existing_names = {column.name for column in columns}
         self._date_columns = []
         new_columns: list[ColumnInfo] = []
 
-        for column_name, date_format in detected:
+        for column_name, date_format in detected_columns:
             suffixes = tuple(
                 s for s in self._ALL_SUFFIXES
                 if f"{column_name}{s}" not in existing_names
@@ -39,7 +37,6 @@ class DateEnrichmentRule(EnrichmentRule):
             for suffix in suffixes:
                 derived = f"{column_name}{suffix}"
                 new_columns.append(ColumnInfo(name=derived, detected_type="numeric", samples=[]))
-                logger.info("DateEnrichmentRule: will add '%s' (format '%s')", derived, date_format)
 
         return new_columns
 
@@ -64,3 +61,4 @@ class DateEnrichmentRule(EnrichmentRule):
                     for suffix in suffixes:
                         row[f"{column_name}{suffix}"] = None
         return rows
+

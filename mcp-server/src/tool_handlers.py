@@ -186,7 +186,6 @@ def _build_date_context() -> dict:
 
 
 def _validate_order(order: str) -> str:
-    """Return normalized order or raise ValueError."""
     normalized = order.lower()
     if normalized not in ("asc", "desc"):
         raise ValueError("order must be 'asc' or 'desc'")

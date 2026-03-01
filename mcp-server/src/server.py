@@ -57,7 +57,8 @@ def build_data_store(csv_file_path: str) -> DataStore:
 host = Config.get("mcp_server.host")
 port = Config.get("mcp_server.port")
 streamable_http_path = Config.get("mcp_server.streamable_http_path")
-mcp_server = FastMCP("MCP Data Server", lifespan=server_lifespan, host=host, port=port, streamable_http_path=streamable_http_path)
+stateless_http = Config.get("mcp_server.stateless_http")
+mcp_server = FastMCP("MCP Data Server", lifespan=server_lifespan, host=host, port=port, streamable_http_path=streamable_http_path, stateless_http=stateless_http)
 
 mcp_server.tool()(tool_handlers.get_schema)
 mcp_server.tool()(tool_handlers.select_rows)

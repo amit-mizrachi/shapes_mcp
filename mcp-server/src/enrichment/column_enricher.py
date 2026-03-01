@@ -25,15 +25,11 @@ class ColumnEnricher:
         sample_rows = parsed_csv.rows[:detection_sample_size]
 
         for rule in self._rules:
-            detected = rule.infer_derived_columns(parsed_csv.columns, sample_rows)
-            if detected:
-                new_columns.extend(detected)
+            columns_to_add = rule.infer_derived_columns(parsed_csv.columns, sample_rows)
+            if columns_to_add:
+                new_columns.extend(columns_to_add)
                 applicable_rules.append(rule)
-                logger.info(
-                    "Enrichment rule %s will add columns: %s",
-                    rule.__class__.__name__,
-                    [column.name for column in detected],
-                )
+                logger.info("Enrichment rule %s will add columns: %s", rule.__class__.__name__, [column.name for column in columns_to_add])
 
         if not applicable_rules:
             return parsed_csv
@@ -42,11 +38,11 @@ class ColumnEnricher:
         for rule in applicable_rules:
             enriched_rows = rule.add_derived_columns(enriched_rows)
 
-        new_columns = self._populate_samples(new_columns, enriched_rows)
+        new_populated_columns = self._populate_samples(new_columns, enriched_rows)
 
         return ParsedCSV(
             table_name=parsed_csv.table_name,
-            columns=list(parsed_csv.columns) + new_columns,
+            columns=list(parsed_csv.columns) + new_populated_columns,
             rows=enriched_rows,
         )
 

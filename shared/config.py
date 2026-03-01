@@ -15,6 +15,7 @@ class Config:
         "mcp_server.host":                 "0.0.0.0",
         "mcp_server.port":                 3001,
         "mcp_server.streamable_http_path": "/mcp",
+        "mcp_server.stateless_http":       True,
 
         # ── Chat Server ──
         "chat_server.mcp_server_url":                "http://mcp-server:3001/mcp",
