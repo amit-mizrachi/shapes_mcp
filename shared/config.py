@@ -17,6 +17,7 @@ class Config:
         "mcp_server.port":                 3001,
         "mcp_server.streamable_http_path": "/mcp",
         "mcp_server.numeric_threshold":    0.8,
+        "mcp_server.max_sample_values":    3,
 
         # ── Chat Server ──
         "chat_server.mcp_server_url":                "http://mcp-server:3001/mcp",

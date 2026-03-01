@@ -9,18 +9,18 @@ from shared.modules.data.parsed_csv import ParsedCSV
 logger = logging.getLogger(__name__)
 
 _SANITIZE_PATTERN = re.compile(r"[^a-z0-9]+")
-_MAX_SAMPLE_VALUES = 3
 
 
 class CSVParser:
     @staticmethod
-    def parse(csv_path: str, numeric_threshold: float = 0.8) -> ParsedCSV:
+    def parse(csv_path: str, numeric_threshold: float = 0.8, max_sample_values: int = 3) -> ParsedCSV:
         """Parse a CSV file into a structured ParsedCSV object.
 
         Args:
             csv_path: Filesystem path to the CSV file.
             numeric_threshold: Fraction of non-blank values that must be
                 numeric for a column to be classified as "numeric" (0-1).
+            max_sample_values: Number of sample values to store per column.
 
         Returns:
             ParsedCSV with sanitized column names, detected types, and rows.
@@ -33,7 +33,7 @@ class CSVParser:
         sanitized_columns = CSVParser._sanitize_column_names(raw_columns)
         table_name = CSVParser.path_to_table_name(csv_path)
         columns, sanitized_rows = CSVParser._detect_types_and_rekey(
-            raw_columns, sanitized_columns, rows, numeric_threshold,
+            raw_columns, sanitized_columns, rows, numeric_threshold, max_sample_values,
         )
 
         return ParsedCSV(
@@ -88,6 +88,7 @@ class CSVParser:
         sanitized_columns: list[str],
         rows: list[dict],
         numeric_threshold: float,
+        max_sample_values: int,
     ) -> tuple[list[ColumnInfo], list[dict]]:
         """Rekey rows to sanitized column names and detect column types."""
         sanitized_rows = [
@@ -101,7 +102,7 @@ class CSVParser:
                 detected_type=CSVParser.detect_column_type(
                     [row[name] for row in sanitized_rows], numeric_threshold,
                 ),
-                samples=[row[name] for row in sanitized_rows[:_MAX_SAMPLE_VALUES]],
+                samples=[row[name] for row in sanitized_rows[:max_sample_values]],
             )
             for name in sanitized_columns
         ]
