@@ -18,3 +18,15 @@ tsconfig.tsbuildinfo
 
 # Agent logs
 agent_logs/
+
+# Internal docs and design notes
+docs/
+
+# Claude agent prompts
+agents/
+
+# Claude Code config
+.claude/
+
+# Sample data
+data/
