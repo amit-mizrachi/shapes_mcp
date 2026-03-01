@@ -29,6 +29,13 @@ class Config:
         "chat_server.gemini_model":      "gemini-2.5-pro",
         "chat_server.gemini_max_tokens": 10000,
         "chat_server.max_iterations":    10,
+        "chat_server.max_malformed_retries": 2,
+        "chat_server.malformed_retry_hint": (
+            "Your previous function call was malformed and could not be parsed. "
+            "Please try again with a simpler structure. If the query requires a "
+            "transform parameter, make sure to follow the exact JSON structure "
+            "from the tool description."
+        ),
         "chat_server.system_prompt": (
             "You are a helpful data analyst assistant. You have access to a database loaded from a CSV file.\n"
             "\n"

@@ -11,14 +11,6 @@ from shared.modules.llm.tool_call import ToolCall
 
 logger = logging.getLogger(__name__)
 
-_MAX_MALFORMED_RETRIES = 2
-_MALFORMED_RETRY_HINT = (
-    "Your previous function call was malformed and could not be parsed. "
-    "Please try again with a simpler structure. If the query requires a "
-    "transform parameter, make sure to follow the exact JSON structure "
-    "from the tool description."
-)
-
 
 class ChatOrchestrator:
     def __init__(
@@ -30,6 +22,8 @@ class ChatOrchestrator:
         self._mcp_manager = mcp_manager
         self._system_prompt = Config.get("chat_server.system_prompt")
         self._max_iterations = Config.get("chat_server.max_iterations")
+        self._max_malformed_retries = Config.get("chat_server.max_malformed_retries")
+        self._malformed_retry_hint = Config.get("chat_server.malformed_retry_hint")
 
     async def execute(self, request: ChatRequest) -> ChatResponse:
         messages = self._build_initial_messages(request)
@@ -47,15 +41,15 @@ class ChatOrchestrator:
                     error_message=llm_response.malformed_message,
                     retry_attempt=malformed_retries,
                 ))
-                if malformed_retries > _MAX_MALFORMED_RETRIES:
-                    logger.warning("Exceeded max malformed function call retries (%d)", _MAX_MALFORMED_RETRIES)
+                if malformed_retries > self._max_malformed_retries:
+                    logger.warning("Exceeded max malformed function call retries (%d)", self._max_malformed_retries)
                     return ChatResponse(
                         answer="I was unable to format a valid tool call for this query. "
                                "Please try rephrasing your question or breaking it into simpler parts.",
                         tool_calls=tool_call_history,
                     )
-                logger.info("Retrying after malformed function call (attempt %d/%d)", malformed_retries, _MAX_MALFORMED_RETRIES)
-                messages.append({"role": "user", "content": _MALFORMED_RETRY_HINT})
+                logger.info("Retrying after malformed function call (attempt %d/%d)", malformed_retries, self._max_malformed_retries)
+                messages.append({"role": "user", "content": self._malformed_retry_hint})
                 continue
 
             if not llm_response.tool_calls:

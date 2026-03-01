@@ -8,6 +8,19 @@ import pytest
 from mcp_client.mcp_client_manager import MCPClientManager
 
 
+CONFIG_VALUES = {
+    "chat_server.mcp_server_url": "http://localhost:3001/mcp",
+    "chat_server.mcp_max_concurrent": 5,
+    "chat_server.semaphore_timeout": 30.0,
+    "chat_server.mcp_connection.retry_attempts": 3,
+    "chat_server.mcp_connection.retry_sleep": 0,
+}
+
+
+def _config_get(key):
+    return CONFIG_VALUES[key]
+
+
 class TestMCPClientManager:
     @pytest.fixture()
     def mock_mcp_client_class(self):
@@ -23,28 +36,37 @@ class TestMCPClientManager:
         with patch("mcp_client.mcp_client_manager.MCPClient", return_value=mock_client) as mock_cls:
             yield mock_cls, mock_client
 
-    async def test_initialize_caches_tools(self, mock_mcp_client_class):
+    @patch("mcp_client.mcp_client_manager.Config")
+    async def test_initialize_caches_tools(self, mock_config, mock_mcp_client_class):
+        mock_config.get.side_effect = _config_get
         _, mock_client = mock_mcp_client_class
-        manager = MCPClientManager(url="http://localhost:3001/mcp", max_concurrent=5, semaphore_timeout=30.0)
+        manager = MCPClientManager()
         await manager.initialize()
         tools = manager.get_tools()
         assert len(tools) == 1
         assert tools[0]["name"] == "get_schema"
 
-    async def test_get_tools_before_init_returns_empty(self):
-        manager = MCPClientManager(url="http://localhost:3001/mcp", max_concurrent=5, semaphore_timeout=30.0)
+    @patch("mcp_client.mcp_client_manager.Config")
+    async def test_get_tools_before_init_returns_empty(self, mock_config):
+        mock_config.get.side_effect = _config_get
+        manager = MCPClientManager()
         assert manager.get_tools() == []
 
-    async def test_client_context_manager(self, mock_mcp_client_class):
+    @patch("mcp_client.mcp_client_manager.Config")
+    async def test_client_context_manager(self, mock_config, mock_mcp_client_class):
+        mock_config.get.side_effect = _config_get
         _, mock_client = mock_mcp_client_class
-        manager = MCPClientManager(url="http://localhost:3001/mcp", max_concurrent=5, semaphore_timeout=30.0)
+        manager = MCPClientManager()
         async with manager.client() as client:
             assert client is mock_client
 
-    async def test_semaphore_limits_concurrency(self, mock_mcp_client_class):
+    @patch("mcp_client.mcp_client_manager.Config")
+    async def test_semaphore_limits_concurrency(self, mock_config, mock_mcp_client_class):
         """Verify that only max_concurrent clients can be acquired simultaneously."""
+        values = {**CONFIG_VALUES, "chat_server.mcp_max_concurrent": 1, "chat_server.semaphore_timeout": 0.1}
+        mock_config.get.side_effect = lambda key: values[key]
         _, mock_client = mock_mcp_client_class
-        manager = MCPClientManager(url="http://localhost:3001/mcp", max_concurrent=1, semaphore_timeout=0.1)
+        manager = MCPClientManager()
 
         acquired = asyncio.Event()
         release = asyncio.Event()
@@ -54,11 +76,9 @@ class TestMCPClientManager:
                 acquired.set()
                 await release.wait()
 
-        # First client holds the semaphore
         task = asyncio.create_task(hold_client())
         await acquired.wait()
 
-        # Second client should raise ConnectionError due to semaphore timeout
         with pytest.raises(ConnectionError, match="busy"):
             async with manager.client():
                 pass
@@ -66,18 +86,20 @@ class TestMCPClientManager:
         release.set()
         await task
 
-    async def test_semaphore_released_on_error(self, mock_mcp_client_class):
+    @patch("mcp_client.mcp_client_manager.Config")
+    async def test_semaphore_released_on_error(self, mock_config, mock_mcp_client_class):
         """Semaphore should be released even if the client raises."""
+        values = {**CONFIG_VALUES, "chat_server.mcp_max_concurrent": 1}
+        mock_config.get.side_effect = lambda key: values[key]
         mock_cls, mock_client = mock_mcp_client_class
         mock_client.__aenter__ = AsyncMock(side_effect=Exception("Connection failed"))
 
-        manager = MCPClientManager(url="http://localhost:3001/mcp", max_concurrent=1, semaphore_timeout=30.0)
+        manager = MCPClientManager()
 
         with pytest.raises(Exception, match="Connection failed"):
             async with manager.client():
                 pass
 
-        # Semaphore should be released — we can acquire again
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         async with manager.client() as client:
             assert client is mock_client

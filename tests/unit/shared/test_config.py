@@ -9,8 +9,8 @@ class TestConfig:
     def test_get_numeric_key(self):
         assert Config.get("mcp_server.default_query_limit") == 20
 
-    def test_get_numeric_threshold(self):
-        assert Config.get("mcp_server.numeric_threshold") == 0.8
+    def test_get_max_query_limit(self):
+        assert Config.get("mcp_server.max_query_limit") == 100
 
     def test_get_missing_key_raises(self):
         with pytest.raises(KeyError):

@@ -3,7 +3,8 @@
 import pytest
 from pydantic import ValidationError
 
-from shared.modules.data.transform_expression import TransformCase, TransformExpression
+from shared.modules.data.transform_case import TransformCase
+from shared.modules.data.transform_expression import TransformExpression
 
 
 def _case(*, column="score", value="high", then_multiply=None, then_value=None):

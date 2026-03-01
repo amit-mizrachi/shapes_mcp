@@ -7,6 +7,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from shared.modules.api.chat_response import ChatResponse
+from shared.modules.api.tool_call_event import ToolCallEvent, ToolCallEventStatus
 
 
 @pytest.fixture()
@@ -30,7 +31,6 @@ def app_with_mocks():
 
         # Manually wire app.state since ASGITransport doesn't trigger lifespan
         server.app.state.orchestrator = mock_uc
-        server.app.state.timeout = 120
 
         yield server.app, mock_uc
 
@@ -89,19 +89,20 @@ class TestChat:
             return ChatResponse(answer="done")
 
         mock_uc.execute = slow_execute
-        app.state.timeout = 0.1
 
-        transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as ac:
-            resp = await ac.post("/chat", json={
-                "messages": [{"role": "user", "content": "hi"}]
-            })
+        with patch("server.Config") as mock_config:
+            mock_config.get.return_value = 0.1
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as ac:
+                resp = await ac.post("/chat", json={
+                    "messages": [{"role": "user", "content": "hi"}]
+                })
         assert resp.status_code == 504
 
     async def test_chat_with_tool_calls(self, client, mock_use_case):
         mock_use_case.execute = AsyncMock(return_value=ChatResponse(
             answer="Found data",
-            tool_calls=[{"tool": "get_schema", "arguments": {}}],
+            tool_calls=[ToolCallEvent(status=ToolCallEventStatus.SUCCESS, tool="get_schema", arguments={})],
         ))
         resp = await client.post("/chat", json={
             "messages": [{"role": "user", "content": "analyze"}]
