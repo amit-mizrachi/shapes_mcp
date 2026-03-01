@@ -3,7 +3,6 @@ import logging
 import os
 import re
 
-from shared.config import Config
 from shared.modules.data.column_info import ColumnInfo
 from shared.modules.data.parsed_csv import ParsedCSV
 
@@ -15,12 +14,26 @@ _MAX_SAMPLE_VALUES = 3
 
 class CSVParser:
     @staticmethod
-    def parse(csv_path: str) -> ParsedCSV:
+    def parse(csv_path: str, numeric_threshold: float = 0.8) -> ParsedCSV:
+        """Parse a CSV file into a structured ParsedCSV object.
+
+        Args:
+            csv_path: Filesystem path to the CSV file.
+            numeric_threshold: Fraction of non-blank values that must be
+                numeric for a column to be classified as "numeric" (0-1).
+
+        Returns:
+            ParsedCSV with sanitized column names, detected types, and rows.
+
+        Raises:
+            ValueError: If the file is missing, unreadable, has no headers,
+                or has no data rows.
+        """
         raw_columns, rows = CSVParser._read_csv(csv_path)
         sanitized_columns = CSVParser._sanitize_column_names(raw_columns)
         table_name = CSVParser.path_to_table_name(csv_path)
         columns, sanitized_rows = CSVParser._detect_types_and_rekey(
-            raw_columns, sanitized_columns, rows,
+            raw_columns, sanitized_columns, rows, numeric_threshold,
         )
 
         return ParsedCSV(
@@ -65,6 +78,7 @@ class CSVParser:
 
     @staticmethod
     def path_to_table_name(csv_path: str) -> str:
+        """Derive a safe SQL table name from the CSV file path."""
         basename = os.path.splitext(os.path.basename(csv_path))[0]
         return CSVParser._sanitize_identifier(basename) or "data"
 
@@ -73,56 +87,39 @@ class CSVParser:
         raw_columns: list[str],
         sanitized_columns: list[str],
         rows: list[dict],
+        numeric_threshold: float,
     ) -> tuple[list[ColumnInfo], list[dict]]:
-        """Detect column types and rekey rows in a single pass over the data."""
-        num_columns = len(raw_columns)
-        numeric_counts = [0] * num_columns
-        totals = [0] * num_columns
-        samples: list[list[str]] = [[] for _ in range(num_columns)]
-        sanitized_rows: list[dict] = []
+        """Rekey rows to sanitized column names and detect column types."""
+        sanitized_rows = [
+            {sanitized: row.get(raw) or "" for raw, sanitized in zip(raw_columns, sanitized_columns)}
+            for row in rows
+        ]
 
-        for row in rows:
-            new_row = {}
-            for column_index in range(num_columns):
-                value = row[raw_columns[column_index]]
-                new_row[sanitized_columns[column_index]] = value
-
-                stripped = value.strip()
-                if stripped:
-                    totals[column_index] += 1
-                    try:
-                        float(stripped)
-                        numeric_counts[column_index] += 1
-                    except ValueError:
-                        pass
-
-                if len(samples[column_index]) < _MAX_SAMPLE_VALUES:
-                    samples[column_index].append(value)
-
-            sanitized_rows.append(new_row)
-
-        numeric_threshold = Config.get("mcp_server.numeric_threshold")
-        columns = []
-        for column_index in range(num_columns):
-            total = totals[column_index]
-            if total == 0:
-                detected_type = "text"
-            else:
-                detected_type = "numeric" if numeric_counts[column_index] / total > numeric_threshold else "text"
-            columns.append(ColumnInfo(
-                name=sanitized_columns[column_index],
-                detected_type=detected_type,
-                samples=samples[column_index],
-            ))
+        columns = [
+            ColumnInfo(
+                name=name,
+                detected_type=CSVParser.detect_column_type(
+                    [row[name] for row in sanitized_rows], numeric_threshold,
+                ),
+                samples=[row[name] for row in sanitized_rows[:_MAX_SAMPLE_VALUES]],
+            )
+            for name in sanitized_columns
+        ]
 
         return columns, sanitized_rows
 
     @staticmethod
-    def detect_column_type(values: list[str]) -> str:
+    def detect_column_type(values: list[str], numeric_threshold: float = 0.8) -> str:
+        """Classify a column as 'numeric' or 'text' based on its values.
+
+        A column is 'numeric' when the fraction of non-blank values that
+        parse as floats exceeds *numeric_threshold*. Blank and None values
+        are ignored.
+        """
         numeric_count = 0
         total = 0
         for raw_value in values:
-            stripped = raw_value.strip()
+            stripped = (raw_value or "").strip()
             if not stripped:
                 continue
             total += 1
@@ -133,4 +130,4 @@ class CSVParser:
                 pass
         if total == 0:
             return "text"
-        return "numeric" if numeric_count / total > Config.get("mcp_server.numeric_threshold") else "text"
+        return "numeric" if numeric_count / total > numeric_threshold else "text"
