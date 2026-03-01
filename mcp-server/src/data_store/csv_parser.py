@@ -9,31 +9,19 @@ from shared.modules.data.parsed_csv import ParsedCSV
 logger = logging.getLogger(__name__)
 
 _SANITIZE_PATTERN = re.compile(r"[^a-z0-9]+")
+_NUMERIC_THRESHOLD = 0.8
+_MAX_SAMPLE_VALUES = 5
+_MAX_SCAN_ROWS = 100
 
 
 class CSVParser:
     @staticmethod
-    def parse(csv_path: str, numeric_threshold: float = 0.8, max_sample_values: int = 3) -> ParsedCSV:
-        """Parse a CSV file into a structured ParsedCSV object.
-
-        Args:
-            csv_path: Filesystem path to the CSV file.
-            numeric_threshold: Fraction of non-blank values that must be
-                numeric for a column to be classified as "numeric" (0-1).
-            max_sample_values: Number of sample values to store per column.
-
-        Returns:
-            ParsedCSV with sanitized column names, detected types, and rows.
-
-        Raises:
-            ValueError: If the file is missing, unreadable, has no headers,
-                or has no data rows.
-        """
+    def parse(csv_path: str) -> ParsedCSV:
         raw_columns, rows = CSVParser._read_csv(csv_path)
         sanitized_columns = CSVParser._sanitize_column_names(raw_columns)
         table_name = CSVParser.path_to_table_name(csv_path)
         columns, sanitized_rows = CSVParser._detect_types_and_rekey(
-            raw_columns, sanitized_columns, rows, numeric_threshold, max_sample_values,
+            raw_columns, sanitized_columns, rows,
         )
 
         return ParsedCSV(
@@ -87,8 +75,6 @@ class CSVParser:
         raw_columns: list[str],
         sanitized_columns: list[str],
         rows: list[dict],
-        numeric_threshold: float,
-        max_sample_values: int,
     ) -> tuple[list[ColumnInfo], list[dict]]:
         """Rekey rows to sanitized column names and detect column types."""
         sanitized_rows = [
@@ -100,14 +86,27 @@ class CSVParser:
             ColumnInfo(
                 name=name,
                 detected_type=CSVParser.detect_column_type(
-                    [row[name] for row in sanitized_rows], numeric_threshold,
+                    [row[name] for row in sanitized_rows], _NUMERIC_THRESHOLD,
                 ),
-                samples=[row[name] for row in sanitized_rows[:max_sample_values]],
+                samples=CSVParser._collect_distinct_samples(sanitized_rows, name),
             )
             for name in sanitized_columns
         ]
 
         return columns, sanitized_rows
+
+    @staticmethod
+    def _collect_distinct_samples(rows: list[dict], column: str) -> list[str]:
+        seen: set[str] = set()
+        samples: list[str] = []
+        for row in rows[:_MAX_SCAN_ROWS]:
+            value = row[column]
+            if value and value not in seen:
+                seen.add(value)
+                samples.append(value)
+                if len(samples) >= _MAX_SAMPLE_VALUES:
+                    break
+        return samples
 
     @staticmethod
     def detect_column_type(values: list[str], numeric_threshold: float = 0.8) -> str:

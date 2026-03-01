@@ -9,6 +9,9 @@ from enrichment.enrichment_rule import EnrichmentRule
 
 logger = logging.getLogger(__name__)
 
+_MAX_SAMPLE_VALUES = 5
+_MAX_SCAN_ROWS = 100
+
 
 class ColumnEnricher:
     def __init__(self, rules: list[EnrichmentRule]) -> None:
@@ -51,15 +54,20 @@ class ColumnEnricher:
     def _populate_samples(
         columns: list[ColumnInfo], rows: list[dict],
     ) -> list[ColumnInfo]:
-        """Return new ColumnInfo objects with samples populated from the first rows."""
+        """Return new ColumnInfo objects with distinct samples populated from rows."""
         result = []
-        max_samples = Config.get("mcp_server.enrichment.max_samples")
-
         for column in columns:
-            samples = [
-                str(row[column.name])
-                for row in rows[:max_samples]
-                if row.get(column.name) is not None
-            ]
+            samples: list[str] = []
+            seen: set[str] = set()
+            for row in rows[:_MAX_SCAN_ROWS]:
+                value = row.get(column.name)
+                if value is None:
+                    continue
+                str_value = str(value)
+                if str_value not in seen:
+                    seen.add(str_value)
+                    samples.append(str_value)
+                    if len(samples) >= _MAX_SAMPLE_VALUES:
+                        break
             result.append(ColumnInfo(name=column.name, detected_type=column.detected_type, samples=samples))
         return result

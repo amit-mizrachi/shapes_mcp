@@ -40,11 +40,7 @@ async def server_lifespan(server: FastMCP):
 
 def build_data_store(csv_file_path: str) -> DataStore:
     logger.info("Parsing CSV data")
-    parsed_csv = CSVParser.parse(
-        csv_file_path,
-        numeric_threshold=Config.get("mcp_server.numeric_threshold"),
-        max_sample_values=Config.get("mcp_server.max_sample_values"),
-    )
+    parsed_csv = CSVParser.parse(csv_file_path)
 
     logger.info("Enriching parsed data")
     enricher = ColumnEnricher(rules=[DateEnrichmentRule()])

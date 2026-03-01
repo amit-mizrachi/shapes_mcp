@@ -99,7 +99,7 @@ class TestParse:
     def test_samples_populated(self, sample_csv_path):
         parsed = CSVParser.parse(str(sample_csv_path))
         for col in parsed.columns:
-            assert len(col.samples) <= 3
+            assert len(col.samples) <= 5
 
     def test_special_column_sanitization(self, special_columns_csv_path):
         parsed = CSVParser.parse(str(special_columns_csv_path))

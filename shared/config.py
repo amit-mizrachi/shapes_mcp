@@ -11,13 +11,10 @@ class Config:
         "mcp_server.db_path":              "/app/db/shapes.db",
         "mcp_server.csv_file_path":        "/app/data/people-list-export.csv",
         "mcp_server.enrichment.detection_sample_size" : 20,
-        "mcp_server.enrichment.max_samples": 3,
         "mcp_server.enrichment.nominal_date_epoch": "1970-01-01",
         "mcp_server.host":                 "0.0.0.0",
         "mcp_server.port":                 3001,
         "mcp_server.streamable_http_path": "/mcp",
-        "mcp_server.numeric_threshold":    0.8,
-        "mcp_server.max_sample_values":    3,
 
         # ── Chat Server ──
         "chat_server.mcp_server_url":                "http://mcp-server:3001/mcp",
@@ -65,6 +62,9 @@ class Config:
             "- Use LIKE operator for partial text matching (e.g., job LIKE '%Manager%' finds all Manager roles).\n"
             "- When a question asks about 'all' records, set limit to 100 or be aware the default is 20.\n"
             "- Use aggregate() with group_by to discover what distinct values exist in a column before filtering.\n"
+            "- NEVER guess or assume what values a column contains. Schema samples show only a subset.\n"
+            "  Before building filters or transforms, verify the actual values by calling\n"
+            "  select_rows(fields=[\"column_name\"], distinct=True) to see all unique values.\n"
             f"- Today's date is {date.today().isoformat()}.\n"
             "\n"
             "Always base your answers on actual query results, not assumptions."
