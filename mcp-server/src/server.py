@@ -45,6 +45,7 @@ def build_data_store(csv_file_path: str) -> DataStore:
     logger.info("Enriching parsed data")
     enricher = ColumnEnricher(rules=[DateEnrichmentRule()])
     enriched_csv = enricher.enrich(parsed_csv)
+    del parsed_csv
 
     logger.info("Ingesting enriched data to database")
     ingester: DataIngestor = SqliteIngester()
